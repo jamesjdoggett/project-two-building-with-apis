@@ -1,0 +1,11 @@
+{% extends 'shows/base.html' %}
+{% block title %}Unable to save | ShowVault{% endblock %}
+{% block content %}
+<h1 class="mb-4 text-3xl font-bold">Unable to save this show</h1>
+<p class="alert alert-error mb-5" role="alert">{{ error }}</p>
+<p class="mb-5">No new entry was saved. Your existing library is still available.</p>
+<form method="post" action="{% url 'shows:save' tvmaze_id %}">
+  {% csrf_token %}<button class="btn btn-primary" type="submit">Try saving again</button>
+</form>
+<a class="link mt-5 inline-block" href="{% url 'shows:discover' %}">Return to discovery</a>
+{% endblock %}

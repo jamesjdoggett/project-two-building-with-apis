@@ -2,8 +2,10 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
+from django.utils import timezone
 
 from . import tvmaze
+from .models import Entry
 
 
 @pytest.fixture(autouse=True)
@@ -52,3 +54,19 @@ def viewer(django_user_model):
 def viewer_client(client, viewer):
     client.force_login(viewer)
     return client
+
+
+@pytest.fixture
+def entry_factory(viewer):
+    def create(**overrides):
+        values = {
+            "owner": viewer,
+            "tvmaze_id": 180,
+            "title": "Firefly",
+            "source_url": "https://www.tvmaze.com/shows/180/firefly",
+            "summary": "A saved local summary.",
+            "retrieved_at": timezone.now(),
+        }
+        return Entry.objects.create(**(values | overrides))
+
+    return create

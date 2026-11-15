@@ -126,7 +126,7 @@ TAILWIND_CLI_VERSION = "2.10.34"
 TAILWIND_CLI_SRC_CSS = "styles/app.css"
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "shows:home"
+LOGIN_REDIRECT_URL = "shows:library"
 LOGOUT_REDIRECT_URL = "login"
 
 # Default primary key field type

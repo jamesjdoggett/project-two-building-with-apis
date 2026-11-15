@@ -14,6 +14,7 @@
     <nav class="navbar mx-auto max-w-6xl flex-wrap gap-3 px-6" aria-label="Main navigation">
       <a class="text-xl font-bold tracking-tight" href="{% url 'shows:home' %}">ShowVault</a>
       {% if user.is_authenticated %}
+        <a class="btn btn-ghost btn-sm" href="{% url 'shows:library' %}">My library</a>
         <a class="btn btn-ghost btn-sm" href="{% url 'shows:discover' %}">Discover shows</a>
         <span class="ml-auto text-sm">{{ user.username }}</span>
         <form method="post" action="{% url 'logout' %}">

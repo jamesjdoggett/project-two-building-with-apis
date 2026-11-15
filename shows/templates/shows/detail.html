@@ -1,0 +1,39 @@
+{% extends 'shows/base.html' %}
+{% load static %}
+{% block title %}{{ entry.title }} | ShowVault{% endblock %}
+{% block content %}
+<a class="link mb-5 inline-block" href="{% url 'shows:library' %}">Back to my library</a>
+<article class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-5">
+    <div class="flex flex-wrap items-start gap-6">
+      <img class="w-32 rounded bg-base-200" src="{% if entry.poster_url %}{{ entry.poster_url }}{% else %}{% static 'shows/poster-placeholder.svg' %}{% endif %}" alt="Poster for {{ entry.title }}" width="128" height="192" data-poster data-fallback="{% static 'shows/poster-placeholder.svg' %}">
+      <div class="min-w-0 flex-1">
+        <h1 class="mb-3 break-words text-3xl font-bold">{{ entry.title }}</h1>
+        <p class="mb-4 whitespace-pre-line break-words">{{ entry.summary }}</p>
+        <dl class="grid gap-3 sm:grid-cols-2">
+          <div><dt class="font-semibold">Genres</dt><dd>{{ entry.genres|join:', '|default:'Unknown' }}</dd></div>
+          <div><dt class="font-semibold">Language</dt><dd>{{ entry.language|default:'Unknown' }}</dd></div>
+          <div><dt class="font-semibold">Premiere date</dt><dd>{{ entry.premiered|date:'Y-m-d'|default:'Unknown' }}</dd></div>
+          <div><dt class="font-semibold">End date</dt><dd>{{ entry.ended|date:'Y-m-d'|default:'Unknown' }}</dd></div>
+          <div><dt class="font-semibold">TVmaze show status</dt><dd>{{ entry.provider_status|default:'Unknown' }}</dd></div>
+        </dl>
+      </div>
+    </div>
+    <section aria-labelledby="personal-heading">
+      <h2 id="personal-heading" class="mb-3 text-xl font-bold">Your viewing</h2>
+      <dl class="grid gap-3 sm:grid-cols-2">
+        <div><dt class="font-semibold">Watch status</dt><dd>Planned</dd></div>
+        <div><dt class="font-semibold">Personal rating</dt><dd>Unrated</dd></div>
+        <div><dt class="font-semibold">Notes</dt><dd>No notes yet.</dd></div>
+        <div><dt class="font-semibold">Last finished season / episode</dt><dd>No bookmark set.</dd></div>
+      </dl>
+    </section>
+    <section aria-labelledby="source-heading" class="text-sm">
+      <h2 id="source-heading" class="mb-2 font-semibold">Source and attribution</h2>
+      <p>Show data from <a class="link" href="{{ entry.source_url }}">{{ entry.provider_name }}</a>, licensed under <a class="link" href="{{ entry.license_url }}">CC BY-SA 4.0</a>. {{ entry.summary_transformation }}</p>
+      <p>Successfully retrieved: <time datetime="{{ entry.retrieved_at|date:'c' }}">{{ entry.retrieved_at|date:'Y-m-d H:i:s T' }}</time></p>
+      <p>Saved: {{ entry.created_at|date:'Y-m-d H:i:s T' }}</p>
+    </section>
+  </div>
+</article>
+{% endblock %}

@@ -19,6 +19,8 @@ class Command(BaseCommand):
                 "malformed",
                 "no-results",
                 "missing-data",
+                "library",
+                "invalid-detail",
             ],
         )
 
@@ -56,9 +58,45 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Demo: {scenario}. No live TVmaze requests. Stop with Ctrl+C."
         )
+        fixtures = response.json.return_value
+        if scenario in {"library", "invalid-detail"}:
+            fixtures = [
+                {
+                    "show": {
+                        "id": 910000000 + number,
+                        "name": f"Demo show {number:02d}",
+                        "url": f"https://www.tvmaze.com/shows/{910000000 + number}",
+                        "summary": (
+                            "<p>Local browser fixture &amp; plain-text snapshot.</p>"
+                        ),
+                        "image": {"medium": "http://127.0.0.1:8000/missing-poster.jpg"},
+                    }
+                }
+                for number in range(1, 22)
+            ]
+
+        def fixture_response(url, **kwargs):
+            if scenario == "timeout":
+                raise requests.Timeout()
+            if scenario in {"library", "invalid-detail", "missing-data"}:
+                if "/search/shows" in url:
+                    response.json.return_value = fixtures
+                elif scenario == "invalid-detail":
+                    response.json.return_value = {"unexpected": "shape"}
+                else:
+                    show_id = int(url.rsplit("/", 1)[-1])
+                    response.json.return_value = next(
+                        (
+                            item["show"]
+                            for item in fixtures
+                            if item["show"]["id"] == show_id
+                        ),
+                        {},
+                    )
+            return response
+
         with patch(
             "shows.tvmaze.requests.get",
-            return_value=response,
-            side_effect=requests.Timeout() if scenario == "timeout" else None,
+            side_effect=fixture_response,
         ):
             call_command("runserver", "127.0.0.1:8000", use_reloader=False)

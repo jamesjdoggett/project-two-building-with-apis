@@ -19,6 +19,10 @@ class ProviderError(Exception):
     """A safe, actionable message suitable for the discovery page."""
 
 
+class ShowNotFound(ProviderError):
+    """The requested provider ID does not identify an available show."""
+
+
 class RateLimited(ProviderError):
     def __init__(self, seconds):
         self.retry_after = max(1, math.ceil(seconds))
@@ -137,16 +141,14 @@ def parse_show(show):
     return SearchShow(show_id, title.strip(), year, text, poster, source)
 
 
-def search_shows(query):
-    """Fetch all search results in provider order; never auto-retry."""
-    query = query.strip()
-    if not query:
-        return []
+def request_json(url, *, params=None, detail=False):
+    """One bounded request; search and detail share the same request budget."""
     request_gate.acquire()
     try:
+        options = {"params": params} if params is not None else {}
         with requests.get(
-            SEARCH_URL,
-            params={"q": query},
+            url,
+            **options,
             headers={"User-Agent": USER_AGENT},
             timeout=(10, 10),
             allow_redirects=False,
@@ -155,15 +157,16 @@ def search_shows(query):
                 seconds = retry_after_seconds(response.headers.get("Retry-After"))
                 request_gate.defer(seconds)
                 raise RateLimited(seconds)
+            if detail and response.status_code == 404:
+                raise ShowNotFound(
+                    "This show is no longer available on TVmaze. Try another show."
+                )
             response.raise_for_status()
             if not 200 <= response.status_code < 300:
                 raise ProviderError(
                     "TVmaze returned an unexpected response. Try again later."
                 )
-            payload = response.json()
-        if not isinstance(payload, list):
-            raise ValueError("Expected search results")
-        return [parse_show(match["show"]) for match in payload]
+            return response.json()
     except requests.Timeout:
         raise
     except requests.ConnectionError:
@@ -172,5 +175,59 @@ def search_shows(query):
         raise ProviderError("TVmaze returned invalid data. Try again later.") from None
     except requests.RequestException:
         raise ProviderError("TVmaze is unavailable. Try again later.") from None
+
+
+def search_shows(query):
+    """Fetch all search results in provider order; never auto-retry."""
+    query = query.strip()
+    if not query:
+        return []
+    payload = request_json(SEARCH_URL, params={"q": query})
+    try:
+        if not isinstance(payload, list):
+            raise ValueError("Expected search results")
+        return [parse_show(match["show"]) for match in payload]
+    except ValueError, TypeError, KeyError, OverflowError:
+        raise ProviderError("TVmaze returned invalid data. Try again later.") from None
+
+
+def get_show(tvmaze_id):
+    """Validate the whole authoritative snapshot before any persistence."""
+    if type(tvmaze_id) is not int or not 1 <= tvmaze_id <= 9223372036854775807:
+        raise ValueError("Enter a positive whole-number TVmaze show ID.")
+    payload = request_json(f"https://api.tvmaze.com/shows/{tvmaze_id}", detail=True)
+    try:
+        show = parse_show(payload)
+        if show.tvmaze_id != tvmaze_id:
+            raise ValueError("Mismatched show ID")
+        genres = payload.get("genres")
+        if genres is None:
+            genres = []
+        if not isinstance(genres, list) or any(
+            not isinstance(genre, str) for genre in genres
+        ):
+            raise ValueError("Invalid genres")
+        language = payload.get("language")
+        status = payload.get("status")
+        language = "" if language is None else language
+        status = "" if status is None else status
+        if not isinstance(language, str) or not isinstance(status, str):
+            raise ValueError("Invalid text metadata")
+        dates = {}
+        for field in ("premiered", "ended"):
+            value = payload.get(field)
+            if value is not None and not isinstance(value, str):
+                raise ValueError("Invalid date")
+            dates[field] = date.fromisoformat(value) if value else None
+        return {
+            "title": show.title,
+            "source_url": show.source_url,
+            "summary": show.summary,
+            "genres": genres,
+            "language": language,
+            "provider_status": status,
+            "poster_url": show.poster_url,
+            **dates,
+        }
     except ValueError, TypeError, KeyError, OverflowError:
         raise ProviderError("TVmaze returned invalid data. Try again later.") from None

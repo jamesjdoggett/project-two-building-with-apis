@@ -5,7 +5,7 @@ from django.urls import reverse
 pytestmark = pytest.mark.django_db
 
 
-@pytest.mark.parametrize("route", ["shows:home", "shows:discover"])
+@pytest.mark.parametrize("route", ["shows:home", "shows:discover", "shows:library"])
 def test_anonymous_pages_require_login_without_provider_call(
     client, provider_http, route
 ):
@@ -22,7 +22,7 @@ def test_ordinary_user_can_sign_in_and_sign_out(client, viewer):
         {"username": viewer.username, "password": "Test-only-947!Moon"},
     )
     assert response.status_code == 302
-    assert response.url == reverse("shows:home")
+    assert response.url == reverse("shows:library")
     home = client.get(response.url)
     assert home.status_code == 200
     assert b"Welcome, viewer" in home.content
@@ -65,7 +65,7 @@ def test_login_accepts_only_safe_next_redirects(client, viewer, next_url):
             "next": next_url,
         },
     )
-    expected = next_url if next_url.startswith("/") else reverse("shows:home")
+    expected = next_url if next_url.startswith("/") else reverse("shows:library")
     assert response.status_code == 302
     assert response.url == expected
 
@@ -109,19 +109,20 @@ def test_admin_can_create_two_ordinary_accounts(
             reverse("login"), {"username": username, "password": "Test-only-583!Forest"}
         )
         assert response.status_code == 302
-        assert client.get(reverse("shows:home")).status_code == 200
+        assert client.get(reverse("shows:home"), follow=True).status_code == 200
         assert client.get(reverse("admin:index")).status_code == 302
         assert client.get(reverse("admin:auth_user_add")).status_code == 302
         client.post(reverse("logout"))
 
 
-def test_phase_one_has_no_public_signup_or_unfinished_actions(viewer_client):
+def test_no_public_signup_or_unfinished_actions(viewer_client):
     assert viewer_client.get("/accounts/signup/").status_code == 404
-    response = viewer_client.get(reverse("shows:home"))
-    assert b'href="/library/' not in response.content
+    response = viewer_client.get(reverse("shows:library"))
+    for action in (b"/edit/", b"/refresh/", b"/delete/", b"/api/"):
+        assert action not in response.content
 
 
-@pytest.mark.parametrize("route", ["shows:home", "shows:discover"])
+@pytest.mark.parametrize("route", ["shows:home", "shows:discover", "shows:library"])
 def test_discovery_and_home_are_read_only(viewer_client, provider_http, route):
     assert viewer_client.post(reverse(route)).status_code == 405
     provider_http[0].assert_not_called()

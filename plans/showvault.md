@@ -2,7 +2,7 @@
 
 > Source PRD: [ShowVault](../prd/showvault.md).
 >
-> Status: six-phase breakdown approved by the user on 2026-11-14. Phase 1 implementation was subsequently authorized and is awaiting manual verification; phases 2–6 have not started.
+> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1 and 2 have been implemented and recorded for browser review; phases 3–6 have not started. Phase 2 changes remain uncommitted as requested.
 >
 > References: [progress prototype](../prototypes/watch-progress.html), [TVmaze research](../research/api-provider-comparison.md), and the adjacent [ATS implementation plan](../../applicant-tracking-system/plans/applicant-tracking-system.md).
 
@@ -67,6 +67,8 @@ Bootstrap the required Django/uv stack, CSS build, pytest configuration, and sha
 ## Phase 2: Saving shows and private local libraries
 
 **User stories**: 5–7, 17; saved indicators complete 4.
+
+**Review status**: implemented and awaiting the user's browser verification, with no commit or push. Actual automated results: 162 pytest tests (plus 13 console subtests) and the separate 7-method console unittest suite pass; Django system checks, migration consistency, Ruff lint/format, applied `shows.0001_initial`, and production CSS build pass. Pytest reports a Windows cache-write warning without test failures. Both selected TDD behaviors were red before implementation and green afterward. Tests include real competing saves on separate SQLite connections, unique-collision recovery, lock feedback, owner/staff isolation, provider failures, and local pagination/rendering without HTTP. Personal fields remain fixed displayed defaults until phase 3, as planned. See README for exact browser scenarios and deterministic fixtures; manual verification is not yet claimed.
 
 ### What to build
 

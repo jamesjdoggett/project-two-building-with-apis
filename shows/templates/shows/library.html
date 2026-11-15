@@ -1,0 +1,39 @@
+{% extends 'shows/base.html' %}
+{% load static %}
+{% block title %}My library | ShowVault{% endblock %}
+{% block content %}
+<div class="mb-8">
+  <h1 class="mb-3 text-4xl font-bold">My library</h1>
+  <p>Welcome, {{ user.username }}. Your saved shows are available here, even when TVmaze is unavailable.</p>
+</div>
+{% if page_obj.object_list %}
+  <p class="mb-5">{{ page_obj.paginator.count }} saved show{{ page_obj.paginator.count|pluralize }}</p>
+  <div class="grid gap-5 md:grid-cols-2">
+    {% for entry in page_obj %}
+      <article class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body">
+          <div class="flex items-start gap-5">
+            <img class="w-24 shrink-0 rounded bg-base-200" src="{% if entry.poster_url %}{{ entry.poster_url }}{% else %}{% static 'shows/poster-placeholder.svg' %}{% endif %}" alt="Poster for {{ entry.title }}" width="96" height="144" loading="lazy" data-poster data-fallback="{% static 'shows/poster-placeholder.svg' %}">
+            <div class="min-w-0">
+              <h2 class="mb-2 break-words text-xl font-bold"><a class="link link-primary" href="{% url 'shows:detail' entry.pk %}">{{ entry.title }}</a></h2>
+              <p>{% if entry.premiered %}Premiered {{ entry.premiered|date:'Y' }}{% else %}Premiere year unknown{% endif %}</p>
+              <p class="mt-2">Planned · Unrated</p>
+              <p class="mt-3 break-words">{{ entry.summary|truncatewords:40 }}</p>
+              <p class="mt-3 text-sm">Data from <a class="link" href="{{ entry.source_url }}">{{ entry.provider_name }}</a>, <a class="link" href="{{ entry.license_url }}">CC BY-SA 4.0</a>. {{ entry.summary_transformation }}</p>
+            </div>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+  {% if page_obj.has_other_pages %}
+    <nav class="mt-6 flex items-center gap-4" aria-label="Library pages">
+      {% if page_obj.has_previous %}<a class="btn btn-outline btn-sm" href="?page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="btn btn-outline btn-sm" href="?page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+    </nav>
+  {% endif %}
+{% else %}
+  <p class="rounded-box border border-base-300 bg-base-100 p-6">Your library is empty. <a class="link link-primary" href="{% url 'shows:discover' %}">Discover shows</a> to save your first show.</p>
+{% endif %}
+{% endblock %}

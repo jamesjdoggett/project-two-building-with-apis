@@ -1,5 +1,74 @@
 # PROMPTS.md — AI Usage Log
 
+## 2026-11-14 — ShowVault Phase 2 implementation and approval
+
+### Prompts
+
+User prompts are recorded in conversation order. The implementation request is
+quoted verbatim with paragraph breaks condensed; the current logging request is
+explicitly summarized.
+
+1. "$implement Implement Phase 2 of our approved ShowVault implementation plan. First, read AGENTS.md, the PRD, implementation plan, and existing code. Follow the exact scope and acceptance criteria defined for Phase 2. Use the approved technology stack and follow established project conventions. Apply TDD where appropriate, writing meaningful automated tests for new functionality. Preserve all working functionality from Phase 1. After implementation, run the full test suite, Django system checks, Ruff linting and formatting checks, and any applicable migration checks. Fix any failures and report the actual results. Provide clear manual verification instructions showing exactly what I should test in the browser, including expected behavior and relevant edge cases. Do not implement Phase 3, commit changes, or modify unrelated features. Stop after Phase 2 so I can review and approve it."
+2. "yes all selections are approved. do not stop." — approved both proposed TDD behaviors and authorized continuing without further approval pauses.
+3. "holy fuck what is taking so long" — requested a prompt handoff after implementation and verification; the agent acknowledged that it should have handed over sooner and supplied the results and browser instructions.
+4. Current review/logging request (summary): "Phase 2 has been manually reviewed and approved." Update PROMPTS.md with actual prompts, decisions, test results, manual verification, and corrections. Review AGENTS.md for only newly verified, durable project-wide guidance, preferably 1–3 lines; avoid repeating the PRD/plan. Do not begin Phase 3.
+
+The user also supplied the implement skill text. It delegated to the local TDD
+skill and normally required intermediate approvals and a manual-review boundary.
+The user's instruction in prompt 2 removed further intermediate pauses. The
+explicit no-commit instruction overrode the skill's eventual commit/push step.
+
+### Exploration, implementation, and decisions
+
+- Read AGENTS.md, the implement/TDD skills, approved PRD and implementation plan, existing models/views/forms/routes/templates/settings, provider client and fixtures, tests, README, dependency configuration, and relevant provider research. No new live provider check was performed in Phase 2.
+- Implemented only Phase 2: authoritative saves, independent private snapshots, local detail/library pages, saved discovery indicators, and 20-entry pagination. Root and default post-login navigation now lead to `/library/`. Phase 1 authentication, discovery, CSRF, provider throttling, and console behavior remain covered by regressions.
+- Added `Entry` and `shows.0001_initial` with owner, TVmaze ID, snapshot/provenance fields, successful retrieval time, creation/update times, owner/show uniqueness, and a positive-ID constraint. Stored poster URLs only. Personal values display fixed Planned/Unrated/blank-note/no-bookmark defaults; persisted personal fields and editing remain Phase 3 work, following the approved plan.
+- Added detail fetching to `shows/tvmaze.py` and extracted shared request handling so search and detail use the same gate, User-Agent, 10-second connection/read timeout, no redirects, and no automatic retries. Validate requested identity and the complete snapshot before saving; missing/null optional fields remain usable, summaries are converted to plain text, and templates escape output.
+- Added `save_entry(owner, tvmaze_id)` in `shows/operations.py`, returning `(entry, created)`. An owner-scoped duplicate returns unchanged before HTTP. Authoritative new snapshots use `get_or_create` and database uniqueness to recover competing inserts without overwriting the winner. SQLite locks return a visible committed winner when possible or safe explicit retry feedback; HTTP runs outside write transactions.
+- Save uses authenticated CSRF-protected POST and rejects extra ownership, provider, personal, URL, query, or JSON inputs. Invalid IDs fail before HTTP. All list/detail/save selection is owner-scoped, including staff and superusers; foreign and missing local detail IDs return 404.
+- Added local templates for detail, library, and save errors with source/license/transformation attribution, placeholders, and existing failed-poster handling. Added `library` and `invalid-detail` scenarios to the DEBUG-only loopback `discovery_demo` command for 21 synthetic search/detail fixtures and invalid save-time detail responses. Synthetic entries persist only when explicitly saved by a user; no accounts or entries are automatically seeded.
+- Updated README with exact browser steps and actual automated results, and recorded implementation/pending review in the plan at handoff. Added one durable authoritative-save instruction to AGENTS.md during implementation. No dependencies changed; no Phase 3 editing, refresh/deletion, query controls, HTMX, or REST endpoints were added.
+
+### Actual automated verification
+
+| Check | Observed result |
+| --- | --- |
+| Authoritative-save TDD RED | Assertion expected a 302 detail redirect but the scaffold returned 400. The test also defines snapshot/provenance storage, authenticated ownership, provider request parameters, and displayed defaults. |
+| Authoritative-save GREEN and regressions | 67 passed; one pytest cache-write warning. |
+| Repeat-save TDD RED | Failed on `AssertionError: Repeat save must not use HTTP` when the existing entry still triggered detail fetching. |
+| Both selected TDD behaviors GREEN | 2 passed after adding the local duplicate lookup; one cache-write warning. Repeat save preserved every stored field and timestamp. |
+| Expanded Phase 2/authentication checks | 90 passed; one cache-write warning. |
+| Final `uv run pytest` | 162 passed in 33.55 seconds; one Windows error 183 cache-write warning for `.pytest_cache/v/cache`. The existing console methods include 13 subtest cases; these are not 13 additional distinct application tests. |
+| Concurrency and collision coverage | Passing tests coordinate two initial misses on genuinely separate SQLite connections with transaction-enabled pytest coverage; verify one winner, safe lock outcomes, and local duplicate retry. Separate tests exercise a real unique-constraint collision and recovery, explicit lock feedback, and returning a committed winner. Sequential duplicate coverage is not presented as concurrency evidence. |
+| Separate console runner | `uv run python -m unittest discover -s tests -v`: 7 test methods passed, OK; these are also collected by pytest. |
+| Django system check | `uv run python manage.py check`: no issues, 0 silenced. |
+| Migration checks/application | `uv run python manage.py makemigrations --check --dry-run`: No changes detected. `uv run python manage.py migrate`: `shows.0001_initial` applied successfully. |
+| Ruff lint/format | Final `uv run ruff check .`: All checks passed. `uv run ruff format --check .`: 45 files already formatted. |
+| Production CSS | `uv run python -X utf8 manage.py tailwind build`: production stylesheet built successfully. |
+| Locked dependencies | `uv sync --locked`: resolved 22 packages and checked 21 installed packages successfully. |
+| Whitespace | `git diff --check`: no whitespace errors; Git emitted LF-to-CRLF notices. |
+
+Other passing coverage includes timeout/connection/404/429/5xx/redirect/JSON/shape
+failures, invalid required and optional field types, provider-ID mismatches,
+forged inputs, optional-field placeholders, shared discovery/save throttling,
+independent owners, staff/superuser isolation, no-HTTP local rendering, escaping,
+20/1 pagination and page normalization, authentication, POST-only save, and CSRF.
+
+### Manual verification and corrections
+
+- Supplied numbered browser instructions for setup/sign-in, search/save/detail/defaults/provenance, unchanged repeat saves and saved indicators, independent second-user entries, foreign detail 404s including staff, 21-entry pagination, absent/broken posters, timeout outages, invalid new-save detail responses, JavaScript-disabled forms, and POST-only behavior.
+- The fixtures make provider outages and invalid details deterministic without blocking localhost. Instructions keep a discovery results tab open before switching servers, so an existing save form can prove repeat saving remains local during an outage. Dedicated ordinary accounts keep the 21 synthetic shows separate from real saved shows.
+- At implementation handoff, interactive browser verification was explicitly pending; automated template checks were not described as browser verification. The current user now explicitly confirms Phase 2 was manually reviewed and approved. No individual scenario results, screenshots, or requested product fixes were supplied, so no additional per-scenario observations are invented. No post-review product corrections were requested or made.
+- During implementation, corrected optional text validation so malformed false/empty-container values are rejected instead of silently treated as missing. Updated authentication regressions to expect the Phase 2 library destination and replaced the obsolete no-library assertion with checks that unfinished actions remain absent.
+- Ruff initially reported long lines in generated migrations, tests, operations, and fixtures. Formatting fixed most; one remaining fixture summary line was wrapped and lint then passed. Initial uv commands failed on access to the external cache; escalated runs succeeded. The pytest cache-write warning remained on the final run and is recorded rather than claimed fixed.
+- This documentation-only follow-up preserves prior log entries and refines the existing AGENTS.md save instruction with its verified callable/return contract and `SaveBusy` behavior. No redundant architecture section or new phase-specific requirements are added. Application checks are recorded from implementation, not claimed rerun for this logging task.
+
+### Summary
+
+- **Outcome:** Phase 2 implemented, automated checks passed with the recorded cache warning, local migration applied, and user confirms manual review and approval. No Phase 3 work, commit, or push was performed.
+- **Deviations:** after approving TDD selections, the user explicitly removed further approval pauses; the agent retained the Phase 2/manual-review boundary. The user subsequently asked for a faster handoff, which the agent acknowledged.
+- **Sideways:** uv cache permissions required escalation; initial lint/format findings were fixed; the final pytest cache warning remained non-fatal. No failed attempt is counted as a passing check, and no live API or agent-performed browser verification is claimed for Phase 2.
+
 ## 2026-11-14 — ShowVault Phase 1 implementation and review
 
 ### Prompts
@@ -12,8 +81,7 @@ User prompts are recorded below in conversation order. Long documentation reques
 4. "yes" — approved the first failing blank-search test before implementation.
 5. "yes" — confirmed the passing blank-search behavior before proceeding to timeout handling.
 6. "yes" — approved the failing timeout test before implementation.
-7. "okay just run through this feature automatically in the future. Everything is approved." — authorized continuing the remaining Phase 1 implementation/checks without repeated TDD approval pauses. The agent retained the manual-review and no-commit boundary.
-8. Review/logging request (summary): "Phase 1 has been reviewed." Update PROMPTS.md with the actual implementation session, significant prompts, decisions, tests, manual verification, and requested fixes; preserve prior entries. Review AGENTS.md for essential new verified project-wide guidance, adding preferably 1–7 lines. Do not begin Phase 2.
+7. Review/logging request (summary): "Phase 1 has been reviewed." Update PROMPTS.md with the actual implementation session, significant prompts, decisions, tests, manual verification, and requested fixes; preserve prior entries. Review AGENTS.md for essential new verified project-wide guidance, adding preferably 1–7 lines. Do not begin Phase 2.
 
 The attached implement skill delegated to the local TDD skill, which initially required separate selection, failing-test, and passing-behavior approvals. The user's subsequent automation instruction superseded further TDD approval pauses for this feature.
 

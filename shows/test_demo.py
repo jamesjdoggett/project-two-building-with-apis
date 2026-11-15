@@ -7,7 +7,8 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import override_settings
 
-from .tvmaze import ProviderError, search_shows
+from . import tvmaze
+from .tvmaze import ProviderError, get_show, search_shows
 
 
 @pytest.mark.parametrize(
@@ -51,3 +52,28 @@ def test_demo_intercepts_provider_only_while_loopback_server_runs(scenario, mess
 def test_demo_is_not_available_with_debug_disabled():
     with pytest.raises(CommandError, match="DEBUG=True"):
         call_command("discovery_demo", "timeout", stdout=StringIO())
+
+
+@pytest.mark.parametrize("scenario", ["library", "invalid-detail"])
+@override_settings(DEBUG=True)
+def test_save_demo_has_search_cards_and_controlled_detail_responses(
+    scenario, monkeypatch
+):
+    def verify_server(*args, **kwargs):
+        shows = search_shows("demo")
+        assert len(shows) == 21
+        assert shows[0].title == "Demo show 01"
+        monkeypatch.setattr(tvmaze, "request_gate", tvmaze.RequestGate())
+        if scenario == "invalid-detail":
+            with pytest.raises(ProviderError, match="invalid data"):
+                get_show(shows[0].tvmaze_id)
+        else:
+            detail = get_show(shows[0].tvmaze_id)
+            assert detail["title"] == shows[0].title
+            assert detail["summary"] == "Local browser fixture & plain-text snapshot."
+
+    with patch(
+        "shows.management.commands.discovery_demo.call_command",
+        side_effect=verify_server,
+    ):
+        call_command("discovery_demo", scenario, stdout=StringIO())

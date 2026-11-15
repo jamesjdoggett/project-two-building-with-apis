@@ -1,11 +1,12 @@
 # project-two-building-with-apis
 
-ShowVault Phase 1 provides administrator-created ordinary accounts, session
-sign-in/sign-out, a protected welcome page, and TVmaze discovery. Saving shows,
-personal libraries, HTMX results, and REST endpoints belong to later phases.
-Phase 1 is awaiting manual review; nothing has been committed by this session.
+ShowVault now supports administrator-created ordinary accounts, session
+sign-in/sign-out, TVmaze discovery, authoritative show saving, and private local
+libraries. Phase 2 is implemented and awaiting browser review. Personal editing,
+refresh/deletion, local search/filter/sort controls, HTMX, and REST endpoints remain
+in their approved later phases. This session has made no commits.
 
-## Run the Phase 1 website
+## Run the website
 
 From the repository root in PowerShell, using the existing uv environment:
 
@@ -24,11 +25,119 @@ leave Staff status and Superuser status unchecked and Active checked. Sign out
 of admin, then use <http://127.0.0.1:8000/accounts/login/> for ordinary sign-in.
 Passwords are chosen locally; no demo accounts or fixed credentials are seeded.
 
-### Browser verification
+### Phase 2 browser verification
+
+Use a fresh ordinary account for an initially empty library, a second ordinary
+account, and an administrator/staff account. New Phase 2 migrations must be applied
+with the setup commands above. Leave at least one second between provider actions;
+if you save immediately after searching, wait guidance and an explicit retry button
+are expected because search and save share the request budget.
+
+1. While signed out, visit `/library/` and a known `/library/<id>/` URL: both
+   redirect to sign-in. Sign in as the fresh ordinary account: the destination is
+   `/library/`, showing an empty-library message and discovery link. `/` also
+   redirects there. Confirm this user cannot access Django admin.
+2. Search `Firefly`, wait a second, and select **Save to library**. You should land
+   on `/library/<local-id>/`, showing the authoritative title, plain-text summary,
+   genres, language, dates, TVmaze status, poster, source/license/transformation
+   notice, successful retrieval time, and saved time. Missing metadata reads
+   **Unknown** or uses another clear placeholder. Personal defaults are **Planned**,
+   **Unrated**, **No notes yet.**, and **No bookmark set.** There are no edit,
+   refresh, delete, or API controls in this phase.
+3. Record the detail URL and retrieval time. Open **My library**: its card opens
+   that detail page. Search again: only shows saved by this account have a
+   **Saved** badge and **Open saved entry** button. Click that button repeatedly:
+   the URL, snapshot, retrieval time, and number of library entries remain the
+   same. In a separate tab, leave these discovery results open for step 6.
+4. Sign in as the second ordinary user in a separate browser profile/private
+   window. Its library starts empty and the first user's detail URL returns 404.
+   Save the same show: it receives a different local detail URL and its own
+   retrieval time. The first entry remains unchanged. Sign in as staff/admin on
+   the ordinary website: the first user's URL must still return 404, and the
+   staff account's library contains only its own entries.
+5. For repeatable fixture tests, stop `runserver` and run
+   `uv run python manage.py discovery_demo library`. It serves 21 synthetic shows
+   for any nonblank search and matching authoritative fixture detail responses,
+   without live HTTP. Use another fresh ordinary account and search `demo`.
+   Save all 21 cards (go back to the results after each save, waiting a second
+   between requests). Its library must contain exactly 20 entries on page 1 and
+   one on page 2, newest saved first, with working **Next**/**Previous** links.
+   `/library/?page=bad` uses page 1; `?page=999` uses the last page. These fixture
+   entries persist in the selected user's local library; use a dedicated test
+   account to keep them separate from real shows. The deliberately broken posters
+   should become local placeholders with JavaScript enabled. Inspect detail
+   placeholders, provenance, and personal defaults as well.
+6. Keep one discovery results tab showing a saved card and an unsaved card.
+   Stop the fixture/normal server and start
+   `uv run python manage.py discovery_demo timeout`. Without reloading that
+   results tab, submit the saved card's **Open saved entry**/**Save to library**
+   button: it still opens the original local entry with unchanged retrieval time.
+   Submit the unsaved card: expect a timeout message, no new entry, and an explicit
+   retry button. Directly reload the saved detail and library URLs: text and
+   provenance remain available. Browser DevTools offline mode would also block
+   localhost, so use this server fixture to simulate a provider outage.
+7. Stop that server and run
+   `uv run python manage.py discovery_demo invalid-detail`. Search `demo` and save
+   a synthetic show not yet saved by the signed-in account. Expect an invalid-data
+   error with no traceback and no new library entry. If all 21 are already saved,
+   use a different ordinary account: repeat saves intentionally bypass invalid
+   provider responses. The fixture exposes valid discovery results and invalid
+   detail responses, so it tests the save boundary specifically.
+8. Retest ordinary discovery, blank/no-results searches, sign-out, keyboard
+   navigation, narrow layouts, and saving with JavaScript disabled. Text is escaped
+   and saving works through ordinary protected POST forms. Visiting
+   `/discover/180/save/` in the address bar returns 405 and never saves. Sign out
+   using the button; the library and details require sign-in again. Stop fixture
+   servers and restart `uv run python manage.py runserver` to restore live TVmaze.
+
+The existing `timeout`, `rate-limit`, `malformed`, `no-results`, and `missing-data`
+discovery fixtures remain available. To test save-time 429 or malformed failures,
+keep an unsaved card open before restarting with the corresponding fixture, then
+submit that existing card. Rate limiting reports the wait interval; failed saves
+create no partial entry. All fixture servers require DEBUG and bind to loopback;
+there is no public failure-selection parameter. SQLite competing saves may return
+a safe **library is busy** retry page when a winning row is not yet visible.
+
+Phase 2 stores only snapshot/provenance fields. The displayed personal defaults
+are fixed until Phase 3 introduces their persisted fields and editing. Unique
+owner/show and positive provider-ID constraints are database-enforced. The shared
+save operation checks for an owned duplicate before HTTP, recovers unique insert
+collisions, and handles SQLite lock contention without retrying provider requests.
+
+### Phase 2 automated verification
+
+Actual results from this session:
+
+- `uv run pytest`: **162 passed**, including 13 console subtests. One pytest
+  cache-write warning reported Windows error 183 for `.pytest_cache/v/cache`;
+  test execution and assertions passed.
+- `uv run python -m unittest discover -s tests -v`: **7 passed**.
+- `uv run python manage.py check`: no issues.
+- `uv run python manage.py makemigrations --check --dry-run`: no changes detected.
+- `uv run python manage.py migrate`: `shows.0001_initial` applied successfully.
+- `uv run ruff check .`: all checks passed.
+- `uv run ruff format --check .`: all 45 Python files formatted.
+- `uv run python -X utf8 manage.py tailwind build`: production stylesheet built.
+
+Both selected TDD behaviors were observed failing on assertions before their
+implementation, then passing: authoritative owned saving and unchanged/no-HTTP
+repeat saving. Additional coverage includes provider detail failures and ID
+mismatches, forged inputs, database constraints, unique-collision recovery, SQLite
+lock feedback, two genuinely competing saves on separate database connections,
+staff/superuser privacy, local rendering with HTTP forbidden, and 20/1 pagination.
+The concurrency test coordinates both initial misses before inserts and allows
+SQLite's explicit safe-retry outcome; a sequential duplicate is not counted as
+concurrency evidence.
+
+Browser scenarios above remain for user review; this record does not claim that
+browser layout or interactive poster fallback was manually verified. No Phase 3
+features, commits, or pushes were performed.
+
+### Phase 1 discovery regression scenarios
 
 1. While signed out, visit `/` and `/discover/`. Both should redirect to sign-in.
    Try incorrect credentials: an accessible error appears and you remain signed
-   out. Sign in with either ordinary account: its welcome page and discovery are
+   out. Sign in with either ordinary account: its library and discovery are
    available without staff privileges. `/admin/` remains inaccessible to that user.
 2. Submit `Firefly` in discovery. Results should show recognizable titles,
    premiere years when known, summaries, and posters. Follow a TVmaze source
@@ -67,7 +176,7 @@ image fallback with JavaScript enabled. The demo command binds only to
 process, and creates no accounts or saved data. Restart `runserver` to resume real
 TVmaze access; there is no public URL or query parameter for selecting fixtures.
 
-### Phase 1 automated checks
+### Automated checks
 
 ```powershell
 uv run pytest
