@@ -2,7 +2,7 @@
 
 > Source PRD: [ShowVault](../prd/showvault.md).
 >
-> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1–4 have been implemented; Phase 4 awaits browser review. Phases 5–6 have not started. This session's changes remain uncommitted as requested.
+> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1–5 have been implemented; Phase 5 awaits browser review. Phase 6 has not started. This session's changes remain uncommitted as requested.
 >
 > References: [progress prototype](../prototypes/watch-progress.html), [TVmaze research](../research/api-provider-comparison.md), and the adjacent [ATS implementation plan](../../applicant-tracking-system/plans/applicant-tracking-system.md).
 
@@ -169,6 +169,8 @@ Add explicit protected POST refresh using the existing detail client and a share
 ## Phase 5: Private REST API reads, creation, and updates
 
 **User stories**: 16, 17; applies 5–7, 9–14.
+
+**Review status**: implemented and awaiting user browser verification; uncommitted. Adds only session-authenticated list/retrieve/create/PUT/PATCH, reusing local queries, authoritative save/race protection, and personal validation. The selected TDD behavior (private local list with provenance) failed on its expected-entry assertion before passing; existing library regression tests then passed. Final verification: 387 pytest tests and 13 subtests passed (101 Phase 5 API tests), with the existing Windows pytest-cache warning; seven console tests, Ruff lint/format (59 files), Django system/migration consistency/applied-migration checks, locked uv sync, production CSS build, and whitespace checks passed. README documents the JSON/session/CSRF contract and numbered browser scenarios. No schema migration is needed. Browser verification is pending and Phase 6 has not started.
 
 ### What to build
 

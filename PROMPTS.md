@@ -1,5 +1,58 @@
 # PROMPTS.md — AI Usage Log
 
+## 2026-11-14 — ShowVault Phase 5 manual acceptance and implementation record
+
+### Prompts
+
+1. The user supplied the ShowVault AGENTS.md instructions and repository environment, including the approved PRD/plan, shared operations, privacy requirements, and required checks.
+2. Implementation request (summary): "$implement Implement Phase 5 of the approved ShowVault implementation plan." Read AGENTS.md, the PRD, and plan; preserve Phases 1–4; complete the exact phase autonomously, including recommended TDD decisions without routine approval pauses. Run focused tests followed by the full regression suite, Django checks, Ruff, and applicable migration checks; fix failures. Add durable AGENTS.md instructions only if needed. Provide actual results and manual verification steps, do not implement Phase 6 or commit, and stop ready for final review.
+3. The user supplied the implement skill text, delegating to TDD and normally requiring approval checkpoints, manual confirmation, logging, commit, and push. The explicit autonomy and no-commit instructions governed this session; implementation stopped for browser review.
+4. Acceptance and logging request (verbatim): "Phase 5 has been manually reviewed and accepted. Update PROMPTS.md with the actual Phase 5 implementation prompts, decisions, test results, manual verification, and any fixes made. Explicitly record that Phase 5 was manually reviewed and accepted.
+
+   Preserve all previous entries. Do not modify other files, run additional tests, or begin Phase 6."
+
+### Decisions and implementation
+
+- Added DRF 3.18.3 through uv and its lockfile, enabled DRF, and configured session authentication and authenticated-user permissions. Added namespaced `/api/entries/` and `/api/entries/<id>/` routes for list/retrieve/create/PUT/PATCH over the existing Entry model. No parallel persistence model, migration, API refresh, or API deletion was introduced.
+- Reused owner-scoped `library_entries` queries, authoritative `save_entry` with existing collision/SQLite contention protection, and shared personal validation. Lists match website filtering, normalization, stable sorting, Unrated-last behavior, and forgiving 20-entry pagination. Representations include snapshot/personal/provenance fields and exclude ownership/account information; staff and superusers remain owner-scoped.
+- Create accepts only an integer TVmaze ID, assigns server-owned defaults, returns 201 for a new snapshot and 200 for an unchanged duplicate without HTTP. Extra fields are rejected. PUT requires all five personal fields; PATCH validates the merged resulting state. Strict JSON validation rejects booleans, floats, and numeric strings for integer values. Bookmark/status independence and explicit two-null clearing are preserved.
+- Added structured provider-error mappings: timeout 504, rate-limit/busy 503 with wait guidance, creation provider-404 400, and other upstream/invalid-data failures 502. Added real-login session/CSRF tests, local outage independence, input-boundary tests, ownership coverage, endpoint collision coverage, and browsable API checks.
+- Documented session cookies/CSRF, query parameters, pagination, accepted JSON, PUT/PATCH semantics, status codes, browser-console examples, and manual scenarios in README. Recorded review status in the plan and two durable API conventions in AGENTS.md. No commit or push was made.
+
+### Actual test results and fixes
+
+- Selected one TDD behavior: private local API listing with provenance. The scaffold failed the expected-entry assertion (`[]` versus `[owned.pk]`); owner-scoped serialization made it pass. The selected API/library regression run then passed all 20 tests.
+- Focused API runs passed 89 tests, then 99 after additional completeness/pair/collision coverage. The initial full run passed 385 tests and 13 subtests. After adding independent-owner creation and browsable-renderer tests and correcting the renderer assertion, the final full run passed **387 tests and 13 subtests**, including **101 Phase 5 API tests**.
+- The separate console suite passed all seven methods. Ruff lint and formatting (59 files), Django system checks, migration consistency and applied-migration checks, locked uv sync, production CSS build, and diff whitespace checks passed. One existing Windows pytest-cache write warning remained; no failing tests were skipped.
+- uv cache access required escalation. A rejected patch was reapplied correctly. Ruff import-order/placement and long-line findings were fixed. A PowerShell-appended non-UTF-8 dash in README was repaired while preserving existing content. The browsable-renderer test initially assumed a hidden Django CSRF form field; inspection showed DRF uses CSRF JSON configuration. The corrected test checks that configuration, the CSRF cookie, and raw JSON input; the final regression run passed.
+
+### Manual verification and acceptance
+
+- The implementation handoff supplied browser scenarios covering signed-in API lists/filtering/pagination/provenance; owner and staff isolation; create 201 versus duplicate 200; personal PUT/PATCH reflected on website pages; invalid and cleared bookmarks; and anonymous/missing-CSRF rejection. Detailed JSON/session examples are in README.
+- **The user explicitly confirmed that Phase 5 was manually reviewed and accepted.** No individual browser observations or additional fixes were supplied with that confirmation, so none are invented here. The earlier entry's pending-review wording records the state at the implementation handoff; this acceptance supersedes that state.
+
+### Summary
+
+- **Outcome:** Phase 5 implementation and automated results are recorded, and Phase 5 was manually reviewed and accepted by the user. All previous log entries are preserved.
+- **Deviations:** autonomous TDD choices and no commit/push followed the user's instructions. This acceptance update changes only PROMPTS.md, runs no additional tests, and does not begin Phase 6.
+- **Sideways:** implementation fixes and the remaining cache warning are recorded above; no new implementation changes or verification claims were added during acceptance logging.
+
+## 2026-11-14 — ShowVault Phase 5 implementation for review
+
+### Prompts
+
+1. The user supplied ShowVault AGENTS.md instructions and the Windows repository environment, including approved references, shared operations, privacy rules, and required verification commands.
+2. `$implement` request (summary): implement exactly Phase 5 of the approved plan, preserving Phases 1–4. Prioritize speed and autonomy, choose recommended TDD options without routine approval checkpoints, run focused tests and then full regressions/system/Ruff/migration checks, fix failures, add durable AGENTS.md guidance only if needed, and finish with changes, actual results, and manual steps. Do not implement Phase 6 or commit; leave the phase ready for final review.
+3. The user supplied the implement skill text, which delegates to TDD and normally requests intermediate approval, manual confirmation, logging, commit and push. The explicit autonomy and no-commit instructions override intermediate pauses and commit/push; final browser verification remains pending.
+
+### Summary
+
+- **Outcome:** added DRF session-authenticated, owner-scoped list/retrieve/create/PUT/PATCH endpoints over existing entries. Reused normalized local queries, save/race protection, and personal validation. Added strict input allowlists/types, complete personal-state PUT, merged PATCH validation, provenance, 20-entry pagination, structured upstream errors, and CSRF coverage using an actual login session. Added API/session examples and numbered browser scenarios in README, Phase 5 review status in the plan, and two durable API instructions in AGENTS.md. Added and locked DRF with uv. No schema changes, API refresh/deletion, commit, or push.
+- **TDD:** selected one important behavior: a private, provider-independent API list with provenance. The scaffold returned an empty results list; the test failed on `[] == [owned.pk]`. Owner-scoped serialization made it pass, and all 20 selected API/library regression tests passed. Remaining Phase 5 behavior followed normal implementation and testing without approval pauses as requested.
+- **Verification:** the initial 89 API tests passed, then 99 passed after completeness/pair/collision additions. The first full regression run passed 385 tests and 13 subtests. Two additional tests cover independent-owner API creation and the browsable renderer. Final full regression result: 387 tests and 13 subtests passed, including 101 Phase 5 API tests, with one existing Windows pytest-cache warning. The separate seven-method console suite, Django system/migration consistency/applied-migration checks, locked uv sync, Ruff lint/format (59 files), production CSS build, and whitespace checks passed. Manual browser scenarios are documented but not claimed as executed.
+- **Deviations:** no requirement changes or routine approval questions. Work stops for final review as requested, without starting Phase 6.
+- **Sideways:** uv cache access required sandbox escalation. One patch format was rejected before changing files and was reapplied correctly. Ruff caught import placement and long lines, which were fixed. PowerShell appended one non-UTF-8 dash to README; the bytes were repaired without changing existing content. A new browsable-renderer test initially expected a hidden Django CSRF form field; the installed DRF renderer uses a CSRF JSON configuration instead. The assertion was corrected against the actual renderer and now also verifies a CSRF cookie and raw JSON input. Pytest reports the existing Windows cache-write warning; no test is skipped for it.
+
 ## 2026-11-14 — ShowVault Phase 4 implementation and approval
 
 ### Prompts

@@ -492,3 +492,97 @@ TVmaze documents fuzzy name search and its response format in its
 TVmaze under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/);
 displayed summaries are converted to plain text. See the
 [provider comparison](research/api-provider-comparison.md) for selection research.
+
+## Phase 5 private REST API
+
+Actual final verification: **387 pytest tests and 13 subtests passed**, including
+101 Phase 5 API tests. One existing Windows pytest-cache write warning remains.
+The separate seven-method console suite passed. Ruff lint and formatting
+(59 files), Django system checks, migration consistency and applied-migration
+checks, `uv sync --locked`, production CSS build, and diff whitespace checks
+passed. No new migration is required. Browser review is pending; no commit or
+Phase 6 implementation was made.
+
+The API uses the same entries as the website. Sign in at `/accounts/login/`,
+then open `/api/entries/` for DRF's browsable API. JSON clients send
+`Accept: application/json` and `Content-Type: application/json`. Retain the
+`sessionid` and `csrftoken` cookies; every POST/PUT/PATCH also requires
+`X-CSRFToken` containing the current CSRF cookie value (login rotates it).
+There are no API tokens or public signup. Anonymous requests receive structured
+403 errors; another owner's ID and a missing ID both return 404, including staff.
+
+| Request | Input / result |
+| --- | --- |
+| `GET /api/entries/` | Owned entries, 20 per page |
+| `GET /api/entries/<id>/` | Owned local snapshot, personal values and provenance |
+| `POST /api/entries/` | Only `{"tvmaze_id":180}`; 201 new, 200 unchanged duplicate |
+| `PUT /api/entries/<id>/` | All five personal fields required; replaces personal state only |
+| `PATCH /api/entries/<id>/` | Supplied personal fields only; validates merged resulting state |
+
+Lists accept `q` (trimmed case-insensitive title substring), `status` (`planned`,
+`watching`, `paused`, `completed`, `dropped`), `sort` (`recent`, `title`, `rating`),
+and `page`. Invalid status/sort normalize to no filter/recent; malformed pages
+select page 1 and out-of-range pages select the last page, matching the website.
+`rating` sorts highest first, Unrated last. Ties are deterministic. Responses
+contain `count`, `page`, `pages`, `next`, `previous`, normalized `q/status/sort`,
+and `results`; next/previous are page numbers or null. Retain the query controls
+when requesting another page. Empty lists have count 0, pages 1, and results [].
+
+A complete PUT body (use the browsable API's raw JSON input) is:
+
+```json
+{"rating":8,"notes":"Private notes\nSecond line","watch_status":"completed","last_season":0,"last_episode":1}
+```
+
+Rating accepts integer 1–10 or null. Notes are a string of at most 5,000
+characters (empty allowed, whitespace/line breaks preserved). Season is an integer
+>=0 and episode an integer >=1, both at most 9223372036854775807; both may be
+null. JSON booleans, numeric strings and floating-point numbers are not integers.
+PATCH may correct one bookmark value if the existing other value completes the
+pair; clear with `{"last_season":null,"last_episode":null}`. Changing status
+never changes bookmarks, and bookmark edits never change status. Ownership,
+metadata, provenance, IDs and timestamps cannot be supplied on update; create
+rejects everything except tvmaze_id. Invalid writes return field-keyed 400 errors
+and preserve the entry. Representations exclude account/owner information.
+
+New saves use authoritative TVmaze data and Planned/Unrated/blank defaults.
+Duplicates bypass HTTP and preserve every value and timestamp. Provider timeout
+returns 504; rate limits return 503 with integer `retry_after` and `Retry-After`;
+provider missing show on creation returns 400 on `tvmaze_id`; other upstream,
+connection, malformed-data and ID-mismatch failures return 502. SQLite save
+contention returns retryable 503 with wait guidance. Provider failures have a
+safe `detail` message and never create partial records. Local reads/edits work
+without TVmaze. API refresh and DELETE belong to Phase 6 and are unavailable.
+
+Manual Phase 5 review (browser verification remains pending):
+
+1. Run migrations, `uv run python -X utf8 manage.py tailwind build`, then
+   `uv run python manage.py runserver`. Sign in and open `/api/entries/`.
+   Check JSON/browsable results and provenance. Combine filters/sorts and page
+   through 21+ entries; expect 20 on page 1 and retained normalized controls.
+2. POST a new ID as raw JSON with session CSRF; expect 201. Repeat the same ID
+   while the controlled timeout fixture is active; expect 200 with identical
+   data. Existing `discovery_demo` fixtures can simulate upstream failures;
+   see the earlier fixture instructions. A new ID timeout returns 504 and
+   creates nothing. Owner/metadata overrides and invalid IDs return 400.
+3. PATCH rating/notes/status, then PUT all five personal fields with the example
+   above. Reload `/library/<id>/` and its edit form; expect the same values and
+   escaped notes. Try a one-null bookmark (400), then both null (200). Try
+   incomplete PUT (400). Status and bookmark must remain independent.
+4. Sign in as a second user and as staff; the first user's ID returns 404 for
+   GET/PUT/PATCH and does not appear in lists. Sign out; expect API JSON 403.
+   Omit X-CSRFToken on an authenticated JSON mutation; expect 403 and no change.
+
+For JSON writes from the browser developer console on a signed-in local page:
+
+```javascript
+const csrf = document.cookie.split('; ').find(c => c.startsWith('csrftoken=')).split('=')[1];
+await fetch('/api/entries/', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+  body: JSON.stringify({tvmaze_id: 180})
+}).then(async r => ({status: r.status, body: await r.json()}));
+```
+
+Use the same headers with PATCH/PUT and an entry URL. Cookies are included on
+same-origin fetches. Re-read the CSRF cookie after signing in again.

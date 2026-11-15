@@ -35,3 +35,5 @@ Private TV show tracking website and REST API for discovering shows through TVma
 - Reuse `shows.library.library_entries(owner, params)` for owner-scoped local lists; it returns the ordered queryset and normalized `q`, `status`, and `sort` controls.
 - Reuse `shows.operations.refresh_entry(owner, pk)` for validated provider refreshes; it updates snapshot fields only after HTTP and raises `Entry.DoesNotExist` if deletion wins, preserving concurrent personal edits.
 - Query fragments share `shows/templates/shows/fragments/`; use `shows.auth.login_required` for HTMX-aware login navigation. HTMX 2.0.8 is served locally with its license; personal mutations remain conventional forms.
+- Private API routes are namespaced `api:entry-list` and `api:entry-detail`; DRF uses session authentication and authenticated-user permissions, with session CSRF on writes.
+- API create accepts only integer `tvmaze_id`; PUT requires all `PERSONAL_FIELDS`, while PATCH validates the merged state. Reject extra fields rather than silently ignoring them.

@@ -22,6 +22,7 @@ from django.urls import include, path
 from shows.forms import SignInForm
 
 urlpatterns = [
+    path("api/", include("shows.api_urls")),
     path("admin/", admin.site.urls),
     path(
         "accounts/login/",
