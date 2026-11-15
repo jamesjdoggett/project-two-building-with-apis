@@ -1,5 +1,140 @@
 # PROMPTS.md — AI Usage Log
 
+## 2026-11-14 — ShowVault API exploration, standalone client, and acceptance
+
+### Prompts
+
+1. API exploration request (summary): inspect the actual URL configuration,
+   views, and serializers; table all endpoints with methods, purpose,
+   authentication, and query parameters; choose related list/detail browser
+   URLs, including JSON requests and a supported filter/sort. Do not modify code.
+2. Endpoint tracing request (summary): explain the list endpoint's exact URL
+   configuration, view, serializer, and model with filenames/line numbers;
+   trace GET through authentication, ownership, retrieval, serialization, and
+   response rendering, and PATCH through permission checks and validation.
+   Keep the explanation suitable for a course design defense; change no code.
+3. Script development request (summary): create `scripts/test_showvault_api.py`
+   against ShowVault's existing DRF API, not TVmaze; inspect actual contracts,
+   reuse uv/dependencies, list with a supported query parameter and pagination,
+   select a saved record, PATCH exactly one editable field, and retrieve/print
+   its before/after values. Use existing authentication without embedded or
+   printed secrets; handle network, authentication, permission, input, empty-list,
+   and update failures. Work autonomously, run appropriate checks, explain safe
+   execution, preserve the TVmaze script/unrelated features, and do not commit.
+4. Acceptance and documentation request (verbatim opening): "The ShowVault API
+   script has been manually reviewed and accepted." The user requested exact
+   README execution/server/authentication/GET/PATCH instructions and an actual
+   workflow/testing/decisions/manual-verification record in PROMPTS.md. Preserve
+   previous entries, add AGENTS.md guidance only for a newly verified durable
+   convention, expose no credentials, run no unnecessary tests, and do not commit.
+
+### Exploration and endpoint tracing
+
+- Read `config/urls.py`, `shows/api_urls.py`, `shows/api.py` (which contains
+  both views and serializers), `shows/library.py`, `shows/models.py`,
+  `shows/personal.py`, and authentication settings. Later inspected the sign-in
+  form/template, project guidance, dependency configuration, and existing tests.
+- Confirmed three API paths: `/api/entries/` (GET/POST),
+  `/api/entries/<int:pk>/` (GET/PUT/PATCH/DELETE), and
+  `/api/entries/<int:pk>/refresh/` (POST), plus framework-provided HEAD where
+  GET exists and OPTIONS. No API root, token-login, or discovery API is configured.
+- Identified list controls `q`, `status`, `sort`, and `page`; pagination is 20
+  records per page. Suggested `sort=title`, browser JSON via `format=json`, and
+  selecting a local entry `id` from list results for the detail URL. ID 1 was
+  explicitly an example, not a claim about an owned record in the local database.
+- Traced `api/` include to `EntryList.as_view()` and `get()`, session identity
+  and `IsAuthenticated`, owner-scoped `library_entries`, ORM filtering/ordering,
+  pagination, `EntrySerializer(..., many=True).data`, and DRF response rendering.
+  Distinguished serializer output data from final JSON rendering. Explained
+  that list/detail GET and personal PATCH use local data without TVmaze HTTP.
+- Traced detail PATCH to owner-scoped lookup, `PersonalSerializer` with
+  `partial=True`, strict field allowlisting, merged-state personal validation,
+  selected-field saving plus `updated_at`, and serialization of the updated entry.
+  Authentication/CSRF failures return 403, foreign/missing entries 404, and invalid
+  personal values 400; staff remain owner-scoped. No code was changed for tracing.
+
+### Implementation and decisions
+
+- Added the standalone `requests` client and `shows/test_api_script.py`; no
+  dependency, lockfile, schema, application endpoint, or authentication changes.
+  The existing TVmaze verification script was untouched.
+- Chose `rating` because it supports an independent single-field update.
+  List GET sends `sort=title`, `page`, and `q`, displays IDs/titles/status/ratings
+  and pagination, and supports interactive next/previous navigation. `--q`
+  filters saved titles; `--list-only` prints the first page without editing.
+- Selection is limited to an ID on the displayed page. The client detail-GETs
+  and prints the old rating, accepts a different integer 1–10 or null, PATCHes
+  only `rating`, then detail-GETs and verifies the saved value. Other personal
+  fields are preserved; the server maintains `updated_at`.
+- Reused Django login with `requests.Session`: obtain the login CSRF cookie,
+  submit credentials with CSRF protection, retain the session cookie, and read
+  the rotated CSRF cookie for PATCH. Credentials come from optional environment
+  variables or username/hidden-password prompts; cookies remain in memory.
+  No passwords, tokens, or cookie values are recorded here.
+- Restricted the configurable origin to local HTTP, disabled redirects on
+  requests, used JSON Accept headers and a 10-second timeout, and added useful
+  failure messages. No automatic retry is performed; interrupted PATCH guidance
+  explains that the server may already have saved the change. Record titles
+  are JSON-escaped for terminal display.
+
+### Actual testing and fixes
+
+- Added a temporary-live-Django-server integration test exercising real session
+  login and rotated-CSRF PATCH, anonymous rejection, invalid credentials,
+  pagination across 22 owned records, title filtering, foreign-entry rejection,
+  invalid-rating rejection, invalid interactive selections, before/after output,
+  preservation of other personal fields, clearing a rating, and expired-session
+  rejection. Explicitly verified that authenticated PATCH without a CSRF header
+  returns 403. Test accounts/data use the temporary test database, not user data.
+- Additional tests simulate timeout and connection failure and confirm that an
+  empty list does not prompt or PATCH. The initial focused run reported **4
+  passed**. It also reported an invalid-escape SyntaxWarning in a test regex and
+  a Windows pytest-cache warning. Changed the regex to a raw string and disabled
+  pytest's cache provider for the final full run; added the explicit CSRF check
+  before that full run.
+- Final `uv run pytest -q -p no:cacheprovider`: **441 tests and 13 subtests
+  passed in 114.43 seconds**. `uv run ruff check .` passed;
+  `uv run ruff format --check .` reported **62 files already formatted**;
+  `uv run python manage.py check` found no issues;
+  `uv run python manage.py makemigrations --check --dry-run` found no changes.
+  `uv run python scripts/test_showvault_api.py --help` exited successfully and
+  displayed the implemented options.
+- Initial uv checks were blocked by sandbox access to the existing uv cache;
+  rerunning with approved escalation succeeded. Initial Ruff checks found a
+  long line and formatting differences; formatting the two new Python files
+  resolved them. No failing application test was weakened or removed.
+- Git status showed a pre-existing `static/css/tailwind.css` modification;
+  it was left untouched. No commit was made.
+
+### Manual verification and acceptance
+
+- Supplied commands to start Django, run the script with interactive credentials,
+  perform GET-only/title-filtered checks, and select a saved ID to change or clear
+  its rating with before/after confirmation. Warned that this updates real saved
+  data and that `q` cancels before writing.
+- **The user explicitly confirmed that the ShowVault API script was manually
+  reviewed and accepted.** No individual manual inputs, observed field values,
+  screenshots, or additional fixes were supplied with that confirmation; none
+  are invented. Automated temporary-server observations are recorded separately
+  above and are not presented as manual tests against the user's saved library.
+- Updated README.md with exact commands, account prerequisites, optional
+  credential environment-variable names, session/CSRF behavior, pagination,
+  GET/PATCH steps, and verification guidance. Preserved previous log entries.
+  AGENTS.md needed no addition: existing session/CSRF, owner-scoping, and uv
+  conventions already cover this client. No tests were rerun for this
+  documentation-only update, and no credentials or commits were created.
+
+### Summary
+
+- **Outcome:** documented the actual API exploration and request tracing,
+  implemented and verified the standalone ShowVault client, and recorded the
+  user's manual review and acceptance.
+- **Deviations:** no new authentication mechanism or external provider calls
+  were needed; routine implementation choices were made autonomously as requested.
+- **Sideways:** corrected Windows search glob/path assumptions during source
+  exploration, uv cache permission failures, formatting, and the test regex
+  warning. These failed attempts are not counted as successful checks.
+
 ## 2026-11-14 — ShowVault Phase 6 manual acceptance and final record
 
 ### Prompts

@@ -26,6 +26,76 @@ leave Staff status and Superuser status unchecked and Active checked. Sign out
 of admin, then use <http://127.0.0.1:8000/accounts/login/> for ordinary sign-in.
 Passwords are chosen locally; no demo accounts or fixed credentials are seeded.
 
+## Explore ShowVault's API with the standalone Python client
+
+[`scripts/test_showvault_api.py`](scripts/test_showvault_api.py) was manually
+reviewed and accepted. It calls this Django application's API, not TVmaze.
+It uses the existing uv environment and `requests` dependency.
+
+From the repository root, start Django in one PowerShell terminal:
+
+```powershell
+uv run python manage.py runserver
+```
+
+For first-time installation, follow the locked dependency, migration, CSS build,
+and account setup under "Run the website" above. Use an active,
+administrator-created ShowVault account and save at least one show through the
+website before testing an update. No API token or new authentication setup is
+required. Signing into a browser does not sign the script in automatically.
+
+In a second terminal at the repository root, run a GET-only demonstration:
+
+```powershell
+uv run python scripts/test_showvault_api.py --list-only
+```
+
+Enter your username and password when prompted; the interactive password prompt
+hides input. No environment variables are required. The optional variables
+`SHOWVAULT_USERNAME` and `SHOWVAULT_PASSWORD` supply credentials instead of
+prompts; prefer the hidden prompt for the password, and do not put credentials
+in source files, documentation, command history, or commits. The script logs in
+through `/accounts/login/`, keeps session/CSRF cookies in memory, and reads the
+rotated CSRF cookie for PATCH. Credentials and cookies are not printed or saved.
+
+GET requests use `/api/entries/` with `sort=title`, `page`, and `q`, and request
+JSON using `Accept: application/json`. Output includes local entry IDs, titles,
+viewing statuses, ratings, total records, current/total pages, and next/previous
+page numbers. `--list-only` displays the first page and exits. To filter titles:
+
+```powershell
+uv run python scripts/test_showvault_api.py --list-only --q "Firefly"
+```
+
+To browse pages and PATCH exactly one user-editable field:
+
+```powershell
+uv run python scripts/test_showvault_api.py
+```
+
+1. Sign in at the prompts. Enter `n` or `p` to navigate pages, or `q` to quit.
+2. Enter a saved entry ID displayed on the current page. This is the local
+   entry's `id`, not its `tvmaze_id`.
+3. The script GETs `/api/entries/<id>/` and prints the current `rating`.
+4. Enter a different whole-number rating from 1 through 10, or `null` to clear
+   it. Enter `q` to cancel before writing. Submitting a valid different value
+   immediately PATCHes only `{"rating": value}` to `/api/entries/<id>/` with
+   the session cookie and `X-CSRFToken`.
+5. A second detail GET verifies and prints the saved rating. Other personal
+   fields stay unchanged; Django also maintains `updated_at`. Reload the
+   website detail page to inspect the same saved value.
+
+This PATCH changes real saved data; you can rerun the script to restore the
+original rating. Only the signed-in user's records are accessible. Empty
+results, invalid input, authentication/permission failures, unavailable entries,
+HTTP failures, timeouts, and connection errors produce useful messages. If a
+PATCH is interrupted, check the saved value before retrying because the server
+may already have applied it. There are no automatic retries.
+
+The default origin is `http://127.0.0.1:8000`. For a different local port, use
+`--base-url http://127.0.0.1:8001` and start Django on that same port. The script
+accepts only local HTTP origins. Use `--help` to see all options.
+
 ## Phase 6 API refresh, deletion, and final demonstration
 
 | Request | Input | Success |
