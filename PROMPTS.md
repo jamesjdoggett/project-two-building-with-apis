@@ -1,5 +1,96 @@
 # PROMPTS.md — AI Usage Log
 
+## 2026-11-14 — Approved six-phase ShowVault implementation plan
+
+### Prompts
+
+1. "$prd-to-plan Read prd/showvault.md, the approved prototype, and the TVmaze research. Create a phased implementation plan following the same engineering approach used in my Applicant Tracking System project. Each phase must be small enough for one coding session and deliver working, testable functionality. Include automated tests, manual verification scenarios, and acceptance criteria for every phase. Introduce models, views, templates, and tests together in usable vertical slices. Do not implement anything yet."
+2. "uh yeah no. lets condense that into 6 phases"
+3. "yes approved and update PROMPTS.md"
+
+The attached `prd-to-plan` skill supplied the vertical-slice workflow and required approval of the proposed breakdown before writing the plan.
+
+### Exploration, decisions, and artifacts
+
+- Read the ShowVault PRD, progress prototype, TVmaze provider research, existing README and dependency configuration, and the adjacent ATS project's plan, guidance, dependency configuration, routes, forms, view patterns, and authentication tests. No new external research or live API verification was performed.
+- Initially proposed twelve phases and requested the skill-required breakdown review. The user rejected that granularity and requested six phases. Proposed a condensed breakdown, which the user explicitly approved before file creation.
+- Created [plans/showvault.md](plans/showvault.md) with the approved phases: authentication/discovery; saving/private local libraries; personal editing/library navigation; refresh/deletion/HTMX; API reads/creation/updates; API refresh/deletion and complete workflow verification.
+- Recorded durable architecture, named and namespaced route paths, one shows app, owner-scoped per-user snapshots, shared save/refresh/validation/query behavior, database constraints, session authentication and CSRF, provider boundaries, error mapping, provenance, and final Independent bookmark rules. Proposed route spelling, model name, and explicit PUT semantics are planning decisions, not additional interview answers.
+- Each phase includes user-story references, end-to-end scope, automated tests, manual scenarios, and checkbox acceptance criteria. Coverage maps account for all 18 PRD stories and acceptance criteria. Tests and manual checks are planned requirements, not reported passing results.
+- Preserved the ATS approach of conventional Django vertical slices, incremental styling, per-phase regression/build checks, and browser-verifiable functionality while retaining ShowVault's ordinary-user and private-owner access requirements.
+
+### Summary
+
+- **Outcome:** saved the approved six-phase plan and updated this log while preserving prior entries. No application implementation or dependency changes were made.
+- **Deviations:** the user replaced the initial twelve-phase proposal with six phases and approved the revised breakdown. The plan identifies phases 3 and 4 as the broadest sessions and bounds them through conventional forms and reuse.
+- **Sideways:** no failed edit commands occurred. Some exploration output was truncated by tool output limits; no missing output was treated as verification. No application tests, browser checks, migrations, CSS build, or live provider requests were run in this documentation-only session.
+
+## 2026-11-14 — ShowVault interview, progress prototype, and PRD
+
+### Prompts
+
+User prompts below are in conversation order. The first prompt is summarized explicitly; quoted short replies are verbatim. Attached skill instructions supplied the interview, prototype, and PRD workflows rather than additional product requirements.
+
+1. Initial `$grill-me` request (summary): design ShowVault, a personal TV tracker using Django, DRF, SQLite, uv, Ruff, Tailwind/DaisyUI through django-tailwind-cli, HTMX, and pytest/pytest-django following the previous ATS project. Required external TVmaze search, local metadata snapshots, personal ratings/notes/status/progress, private searchable/filterable/sortable/paginated library, own CRUD API, consistent authentication/ownership, and graceful request failure handling. Read existing research and the API verification script before interviewing; ask one question at a time with tradeoffs; pause for at least one meaningful `$prototype`; do not write a PRD or implement yet.
+2. "go with option 2 and use prototype" — selected last-watched season/episode rather than total episodes watched or individual episode checklists.
+3. "I'll go with independent. Continue with the rest of the grill me questions." — selected independent status/bookmark rules after the prototype was supplied.
+4. "option 2" — selected Planned, Watching, Paused, Completed, and Dropped.
+5. "recommended option" — administrator-created ordinary accounts, rather than public registration.
+6. "recommended option" — one saved entry per user per show, rather than separate rewatch entries.
+7. "recommended option" — optional whole-number personal rating from 1–10.
+8. "recommended option" — local metadata snapshot with explicit manual refresh.
+9. "recommended option" — separate metadata snapshot per user entry, rather than a shared show catalog.
+10. "recommended option" — poster URLs with a local placeholder, rather than downloaded images.
+11. "recommended option" — submitted discovery search, rather than search-as-you-type.
+12. "recommended option" — save immediately as Planned, then open the detail page.
+13. "recommended option" — session authentication for website and API, rather than adding tokens.
+14. "recommended option" — API creation from a TVmaze ID with server-fetched metadata.
+15. "recommended option" — title search, status filter, recently saved/title/rating sorting, and 20 entries per page.
+16. "recommended option" — permanent deletion with website confirmation, rather than trash/restore.
+17. "recommended option" — manual bookmarks without episode lookup: both fields set or both blank, season >= 0 and episode >= 1.
+18. "recommended option" — optional private plain-text notes, maximum 5,000 characters.
+19. "recommended option" — no automatic retries, preserved query, and a 10-second connection/read timeout.
+20. "recommended option" — dedicated owner-protected API metadata-refresh action.
+21. "just go with the recommended option for the remainder of the questions" — accepted the pending duplicate API-save recommendation and delegated remaining choices. The agent stopped interviewing and summarized recommended defaults.
+22. "$to-prd Create a complete Product Requirements Document for ShowVault using our completed interview, selected prototype, and TVmaze research. Include all assignment requirements, user stories, implementation decisions, validation rules, authentication and ownership policies, local metadata storage, external API error handling, and acceptance criteria. Do not implement the application yet."
+23. "Update PROMPTS.md with the actual $grill-me interview, $prototype design comparisons, decisions, and $to-prd session. Do not invent prompts or results. Preserve existing entries."
+
+### Exploration and prototype
+
+- Read the existing TVmaze research, console verification script and tests, README, and dependency configuration. Read the adjacent ATS project's guidance, dependencies, and README for its conventional Django, local assets, HTMX, Tailwind/DaisyUI, pytest, and Ruff conventions. No new live provider verification was performed.
+- Created [watch-progress.html](prototypes/watch-progress.html), a standalone, memory-only HTML/CSS/JavaScript logic prototype with free-play controls and tabbed guided walkthroughs. This compared business rules, not visual interface variations.
+- **Assisted:** saving progress changes Planned or Completed to Watching; choosing Planned clears the bookmark. Correcting progress preserves Paused and Dropped.
+- **Independent:** saving, correcting, or clearing a bookmark never changes status; changing any status never changes the bookmark. The agent recommended this to preserve user intent, and the user explicitly selected it.
+- Walkthroughs cover starting, pausing/resuming, completing then correcting, planning a rewatch, and specials/invalid numbers. The comparisons expose automatic reopening after a correction and automatic bookmark clearing under Assisted rules. Relevant state and feedback are rendered after actions.
+- The artifact initially selects Assisted and labels some statuses exploratory. The subsequent PRD explicitly records the final Independent decision and five approved statuses. Prototype code is throwaway, not production architecture.
+- The agent did not open or exercise the prototype in a browser and wrote no prototype tests. The user's selection is recorded; which walkthroughs the user personally ran is unknown.
+
+### Decisions and PRD
+
+- Accounts are created by administrators through Django admin; ordinary users need no staff status. Require login for discovery and all library/HTMX/API operations. Use Django sessions and CSRF-protected writes. Owner-scope all queries and return 404 for another user's entry, including refresh/delete. Staff using ordinary application endpoints remain owner-scoped.
+- One entry per user/TVmaze show ID, with separate local metadata and personal fields. Repeated saves open/return the existing entry unchanged before contacting TVmaze. API creation returns 201 for new entries and 200 for duplicates.
+- Save new entries as Planned, Unrated, blank notes, and no bookmark. Ratings are optional integers 1–10; notes are optional private plain text up to 5,000 characters. Bookmarks identify the last episode finished: whole season >= 0 (specials use 0) and episode >= 1, both present or both absent. No episode lookup or automatic completion. Status and progress remain independent.
+- Store TVmaze ID/source link, title, plain-text summary, genres, language, premiere/end dates, provider show status, poster URL, and retrieval timestamp. Preserve attribution/provenance in website/API output and escape notes/summaries. Missing optional data gets placeholders; images are not downloaded.
+- Refresh is explicit and changes only that entry's provider metadata. Failure preserves the last good snapshot and personal values. Saved browsing, personal editing, and deletion remain usable without TVmaze.
+- Discovery uses submitted searches and relevance-ordered results with saved indicators. Local library controls are title search, status filtering, recently saved (default)/title A–Z/highest personal rating sorting, Unrated last, and 20-entry pagination retaining query controls.
+- API supports CRUD plus refresh, uses server-fetched metadata for creation, and accepts only personal fields on ordinary updates. Website deletion requires confirmation and protected POST; API DELETE acts immediately after authorization. Re-saving a deleted show starts fresh.
+- Failures distinguish empty results from timeouts, HTTP/rate-limit errors, connection failures, invalid JSON, and malformed data. Preserve input/data, use a 10-second connection/read timeout, and do not retry automatically.
+- Under the user's delegated defaults, the agent recommended one shows app plus Django configuration, a small provider client, shared save/refresh and validation logic, consistent library/API query controls, and meaningful mocked-provider tests. These were summarized defaults, not separately answered interview questions.
+- Created [the PRD](prd/showvault.md), with assignment coverage, 18 user stories, implementation decisions, validation, access policies, storage, website/API behavior, external failures, 18 acceptance criteria, exclusions, and reference notes.
+- PRD synthesis adds specific implementation details such as deterministic sort ties, concurrent duplicate protection, atomic refreshes, HTMX login-expiry handling, a small shared request throttle, and error mapping (504 timeout, retryable 503 rate limit, 502 other upstream failures, 400 invalid ID on new creation). These were not individually interviewed choices.
+
+### Actual verification and limitations
+
+- Prototype and PRD file-creation calls succeeded. A file inspection reported the PRD as 23,313 bytes; Git status showed the PRD and prototype directories untracked.
+- `git diff --check` after PRD creation reported no whitespace errors, but did not check the new untracked artifacts. It does not establish application or prototype correctness.
+- No application code, dependencies, migrations, automated application tests, browser tests, CSS build, new live API checks, or deployment were performed in this design/PRD session.
+
+### Summary
+
+- **Outcome:** completed the interview, created the logic comparison, recorded Independent bookmark behavior, and saved a complete ShowVault PRD. No Django application was implemented.
+- **Deviations:** the user accepted recommended choices, explicitly selected Independent, then requested recommended defaults for remaining decisions. The PRD was written only after a separate request.
+- **Sideways:** a higher-level directory listing for guidance was denied; reading the adjacent ATS project directly succeeded. The prototype retains exploratory/default wording, distinguished from final requirements in the PRD. During this logging task, an attempted Python-based prepend failed because the shell's python.exe could not run; it made no file change, and the entry was added with a patch instead.
+
 ## 2026-11-14 — TVmaze interview, uv setup, and console API verification
 
 ### Prompts

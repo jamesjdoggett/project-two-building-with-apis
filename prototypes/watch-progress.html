@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShowVault — progress rules prototype</title>
+<style>
+  body{font:17px/1.5 system-ui,sans-serif;background:#f4f6f8;color:#182635;margin:0}main{max-width:900px;margin:40px auto;padding:0 24px}h1,h2{line-height:1.2}section{background:white;border:1px solid #d8e0e7;border-radius:12px;padding:24px;margin:20px 0}button,input,select{font:inherit;padding:9px;border:1px solid #b8c5d0;border-radius:6px}button{cursor:pointer;background:#edf4fa;color:#153f64;margin:4px}button[aria-selected=true]{background:#174f7a;color:white}button:disabled{opacity:.45;cursor:default}label{display:inline-block;margin:8px}input{width:85px}dl{display:grid;grid-template-columns:180px 1fr;gap:10px}dt{color:#526272}dd{margin:0;font-weight:600}.notice{border-left:4px solid #174f7a;padding-left:16px}.muted{color:#526272}#feedback{min-height:3em}nav{display:flex;flex-wrap:wrap}
+</style>
+<main>
+<p class="muted">SHOWVAULT · THROWAWAY LOGIC PROTOTYPE · No data is saved</p>
+<h1>A bookmark, and your decision to stop</h1>
+<p>Question: should entering your last watched season and episode automatically change your watch status, or should you control both separately? Try both policies below. Paused and Dropped are exploratory statuses, not approved requirements.</p>
+<section>
+<h2>Policy to try</h2>
+<label><select id="policy"><option value="assist">Assisted: saving progress starts watching</option><option value="independent">Independent: status changes only when you choose</option></select></label>
+<p id="policyHelp"></p>
+</section>
+<section aria-live="polite">
+<h2>Your saved show: Example Show</h2>
+<dl id="state"></dl>
+<p id="feedback" class="notice"></p>
+</section>
+<section>
+<h2>Free play</h2>
+<p>This bookmark means the <strong>last episode you finished</strong>. Both values must be entered together. Season 0 represents specials; episode numbers start at 1. We do not check whether an episode exists.</p>
+<label>Season <input id="season" type="number" min="0" step="1" value="2"></label>
+<label>Episode <input id="episode" type="number" min="1" step="1" value="4"></label>
+<button id="save">Save bookmark</button><button id="clear">Clear bookmark</button>
+<p>Choose status:</p><div id="statuses"></div>
+<button id="reset">Reset demo</button>
+</section>
+<section>
+<h2>Guided walkthroughs</h2>
+<p>Choose a tab to reset the show. Then press the steps in order. Switching policy also resets the show.</p>
+<nav role="tablist" aria-label="Scenarios" id="tabs"></nav>
+<h3 id="scenarioTitle"></h3><p id="scenarioDescription"></p><div id="steps"></div>
+</section>
+<p class="muted">Prototype only: plain inline HTML/CSS/JavaScript to open directly, not the production interface. The application will use the agreed Django, Tailwind/DaisyUI, and HTMX stack.</p>
+</main>
+<script>
+// Pure state model. The page below supplies inputs and renders results.
+const initial = () => ({status:'Planned',season:null,episode:null,message:'Show saved as Planned, with no bookmark.'});
+function transition(state,action,policy){
+  const next={...state};
+  if(action.type==='bookmark'){
+    if(!Number.isInteger(action.season)||action.season<0||!Number.isInteger(action.episode)||action.episode<1)
+      return {...state,message:'Bookmark rejected: enter a whole season number of 0 or higher and an episode number of 1 or higher. Nothing changed.'};
+    next.season=action.season;next.episode=action.episode;
+    if(policy==='assist'&&['Planned','Completed'].includes(state.status))next.status='Watching';
+    next.message=`Bookmark saved. ${next.status!==state.status?'Status changed to Watching.':'Status kept as '+next.status+'.'}`;
+  }else if(action.type==='status'){
+    next.status=action.value;
+    if(policy==='assist'&&action.value==='Planned'){
+      next.season=null;next.episode=null;next.message='Status changed to Planned; bookmark cleared.';
+    }else next.message=`Status changed to ${action.value}; bookmark retained. Completed means you choose to stop here, not that we verified a series finale.`;
+  }else if(action.type==='clear'){
+    next.season=null;next.episode=null;next.message='Bookmark cleared; status retained.';
+  }
+  return next;
+}
+const scenarios=[
+ {title:'Start watching',description:'Save your first bookmark. Does the status change match your expectation?',steps:[['Finish S1 E1',{type:'bookmark',season:1,episode:1}]]},
+ {title:'Pause and resume',description:'Pause a show, correct its bookmark, then resume. A correction keeps Paused under both policies.',steps:[['Save S2 E4',{type:'bookmark',season:2,episode:4}],['Pause',{type:'status',value:'Paused'}],['Correct to S2 E3',{type:'bookmark',season:2,episode:3}],['Resume watching',{type:'status',value:'Watching'}]]},
+ {title:'Complete, then correct',description:'Complete a show, then correct a mistaken episode number. Assisted rules reopen the show; independent rules preserve Completed. Is automatic reopening helpful or surprising?',steps:[['Save S3 E8',{type:'bookmark',season:3,episode:8}],['Mark completed',{type:'status',value:'Completed'}],['Correct to S3 E7',{type:'bookmark',season:3,episode:7}]]},
+ {title:'Plan a rewatch',description:'Return a watched show to Planned. Assisted rules erase the bookmark; independent rules retain it until explicitly cleared.',steps:[['Save S4 E10',{type:'bookmark',season:4,episode:10}],['Mark completed',{type:'status',value:'Completed'}],['Set Planned',{type:'status',value:'Planned'}],['Explicitly clear bookmark',{type:'clear'}]]},
+ {title:'Specials and invalid input',description:'A special can use season 0. Episode 0 is rejected without changing the saved state.',steps:[['Save special S0 E1',{type:'bookmark',season:0,episode:1}],['Try invalid S1 E0',{type:'bookmark',season:1,episode:0}]]}
+];
+const el=id=>document.getElementById(id);
+let state=initial(),scenarioIndex=0,stepIndex=0;
+function dispatch(action){state=transition(state,action,el('policy').value);render();}
+function render(){
+ el('state').replaceChildren();
+ for(const [label,value] of [['Watch status',state.status],['Last season finished',state.season??'Not entered'],['Last episode finished',state.episode??'Not entered'],['Episode verified?', 'No — manual bookmark'],['Storage','Memory only; reload resets everything']]){
+   const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;el('state').append(dt,dd);
+ }
+ el('feedback').textContent=state.message;
+ el('policyHelp').textContent=el('policy').value==='assist'?'Saving progress changes Planned or Completed to Watching. Choosing Planned clears the bookmark. Paused and Dropped remain unchanged when correcting progress.':'Saving or clearing a bookmark never changes status. Choosing any status never changes the bookmark. You explicitly control both fields.';
+ const scenario=scenarios[scenarioIndex];
+ el('scenarioTitle').textContent=scenario.title;el('scenarioDescription').textContent=scenario.description;
+ el('steps').replaceChildren();
+ scenario.steps.forEach(([label,action],i)=>{const button=document.createElement('button');button.textContent=`${i+1}. ${label}${i<stepIndex?' ✓':''}`;button.disabled=i!==stepIndex;button.onclick=()=>{stepIndex++;dispatch(action)};el('steps').append(button)});
+ [...el('tabs').children].forEach((button,i)=>button.setAttribute('aria-selected',String(i===scenarioIndex)));
+}
+for(const status of ['Planned','Watching','Paused','Completed','Dropped']){const button=document.createElement('button');button.textContent=status;button.onclick=()=>dispatch({type:'status',value:status});el('statuses').append(button)}
+scenarios.forEach((scenario,i)=>{const button=document.createElement('button');button.textContent=scenario.title;button.setAttribute('role','tab');button.onclick=()=>{scenarioIndex=i;stepIndex=0;state=initial();render()};el('tabs').append(button)});
+el('save').onclick=()=>dispatch({type:'bookmark',season:el('season').value===''?NaN:Number(el('season').value),episode:el('episode').value===''?NaN:Number(el('episode').value)});
+el('clear').onclick=()=>dispatch({type:'clear'});
+el('reset').onclick=el('policy').onchange=()=>{state=initial();stepIndex=0;render()};
+render();
+</script>
+</html>
