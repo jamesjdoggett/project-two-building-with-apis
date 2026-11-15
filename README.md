@@ -3,9 +3,9 @@
 ShowVault now supports administrator-created ordinary accounts, session
 sign-in/sign-out, TVmaze discovery, authoritative show saving, and private local
 libraries, personal editing, local search/filter/sort controls, explicit metadata
-refresh, confirmed deletion, and HTMX discovery/library interactions. Phase 4 is
-implemented and awaiting browser review. REST endpoints remain in Phases 5–6.
-This session has made no commits.
+refresh, confirmed deletion, HTMX discovery/library interactions, and the complete
+private REST API. Phase 5 was manually reviewed and accepted; Phase 6 is
+implemented and awaiting browser review. This session has made no commits.
 
 ## Run the website
 
@@ -25,6 +25,144 @@ under Authentication and Authorization → Users. Give each a usable password;
 leave Staff status and Superuser status unchecked and Active checked. Sign out
 of admin, then use <http://127.0.0.1:8000/accounts/login/> for ordinary sign-in.
 Passwords are chosen locally; no demo accounts or fixed credentials are seeded.
+
+## Phase 6 API refresh, deletion, and final demonstration
+
+| Request | Input | Success |
+| --- | --- | --- |
+| `POST /api/entries/<id>/refresh/` | No body, or empty JSON object; no query parameters | 200 with the updated entry |
+| `DELETE /api/entries/<id>/` | No body, or empty JSON object; no query parameters | 204 with no response body; immediate permanent deletion |
+
+Both actions require the signed-in owner's session and CSRF token, including in
+the browsable API. Extra metadata, ownership, personal fields, arbitrary URLs,
+and query overrides return structured 400 errors. Foreign and missing IDs return
+JSON 404, including for staff; anonymous requests return JSON 403. Unsupported
+methods return 405 without mutation (refresh is POST only). Website deletion
+continues to require its confirmation form; API DELETE needs no confirmation.
+
+Refresh reuses the website operation: fetch and validate the complete TVmaze
+snapshot before writing provider fields and retrieval/update timestamps. Personal
+fields, creation time, and other owners' snapshots stay unchanged. Edits made
+during provider HTTP survive; deletion during HTTP returns 404 without recreating
+the entry. A failed refresh preserves every saved field and successful timestamp.
+No write transaction spans provider HTTP and no automatic retry occurs.
+
+| Failure | Response |
+| --- | --- |
+| Provider timeout | 504, safe `detail` with retry guidance |
+| Provider 429 or shared request cooldown | 503, `detail`, integer `retry_after` and `Retry-After` header |
+| SQLite refresh write contention | Retryable 503 with wait guidance |
+| Connection failure, other upstream errors, malformed JSON/data, ID mismatch | 502 with safe `detail` |
+| Provider detail 404 | Refresh: 502; new API creation: 400 on `tvmaze_id` |
+
+Errors never include raw provider bodies, tracebacks, or secrets. Local listing,
+retrieval, personal updates, and deletion make no provider requests. A duplicate
+create returns 200 unchanged during outage. Saving after deletion returns 201
+with fresh Planned/Unrated/blank-note/no-bookmark defaults.
+
+### Manual final review
+
+Use two ordinary accounts and a staff account in separate browser profiles.
+Stop the server before switching fixture scenarios. Every fixture is DEBUG-only,
+binds to loopback, mocks provider HTTP, and uses the same local database. Wait at
+least one second between provider actions, or honor the returned cooldown.
+
+1. Run `uv run python manage.py discovery_demo library`. Sign in, search `demo`,
+   and save a show. Edit rating/notes/status, set S0 E1, mark Completed, correct
+   the bookmark, then return to Planned. Expect status/bookmark independence.
+   Combine local title/status/sort controls and paginate 21 saved matches. Check
+   provenance, loading/result feedback, escaped notes, and the local fallback
+   for the fixture's intentionally broken posters. Repeat query controls with
+   JavaScript disabled; they should still work.
+2. Open `/api/entries/` or use the browser-console helper below. PATCH personal
+   fields and reload `/library/<id>/`; expect identical values. Stop the server
+   and run `uv run python manage.py discovery_demo refreshed`. POST API refresh:
+   expect 200, a title ending in `refreshed`, an updated summary/retrieval time,
+   unchanged personal fields/creation time, and no change to the second user's
+   independently saved copy. Reload the website to confirm the same snapshot.
+3. Restart with `timeout`, `rate-limit`, `removed`, and `malformed` in turn.
+   Refresh the existing ID: expect 504, 503 with wait guidance, 502, and 502,
+   respectively. Compare the last good snapshot and successful timestamp on the
+   website after each failure; nothing should change. In `removed`, a new ID
+   create returns 400, contrasting with refresh 502. Under `timeout`, local
+   website/API reads, queries, edits, deletion, and duplicate create still work.
+4. Attempt another user's detail/edit/refresh/delete URLs from the second user
+   and staff sessions; expect 404 and unchanged data. Sign out and request the
+   API with `Accept: application/json`; expect JSON 403, never login HTML.
+   Omit or alter X-CSRFToken on an authenticated refresh/DELETE; expect 403 and
+   no mutation. Expire a session before an HTMX query and expect full navigation
+   to login. Use an ordinary fresh browser profile to avoid shared sessions.
+5. DELETE an owned API entry (this permanently erases its personal data): expect
+   empty 204, website/API detail 404, and absence from the library. Switch back
+   to `library` and save it again; expect fresh defaults. Separately open the
+   website deletion confirmation, Cancel, verify preservation, then confirm.
+   Follow the locked setup commands above in a clean directory if desired.
+
+Browser-console helper on a signed-in local page (re-reads CSRF after login):
+
+```javascript
+async function vaultApi(method, path, body) {
+  const token = document.cookie.split('; ')
+    .find(c => c.startsWith('csrftoken=')).split('=')[1];
+  const headers = {'Accept': 'application/json', 'X-CSRFToken': token};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const response = await fetch(path, {
+    method, headers,
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  return {status: response.status,
+          body: response.status === 204 ? null : await response.json()};
+}
+// Replace 123 with your local entry ID from GET /api/entries/.
+await vaultApi('PATCH', '/api/entries/123/', {notes: 'API edit', rating: 9});
+await vaultApi('POST', '/api/entries/123/refresh/');
+// Run only when ready to permanently delete this entry:
+await vaultApi('DELETE', '/api/entries/123/');
+```
+
+### Final coverage and setup evidence
+
+Final automated results: **437 pytest tests and 13 subtests passed**, including
+50 new Phase 6 action/workflow tests. The seven-method console suite passed.
+Ruff lint and formatting (60 files), Django system checks, migration consistency
+and applied-migration checks, `uv sync --locked`, production CSS build, and diff
+whitespace checks passed. No new migration was needed. Pytest reported the
+existing Windows cache-write warning; no tests were skipped or weakened.
+
+All required features are implemented. Browser acceptance of Phase 6 remains
+pending; automated HTTP smoke checks do not claim visual browser verification.
+Provider uptime and live TVmaze availability were not tested in this phase.
+
+An isolated temporary source copy was installed with `uv sync --locked` into a
+new virtual environment (22 packages), using the current lockfile and Python
+3.14.7. No existing database or environment was copied. All Django migrations
+applied successfully; system checks, migration consistency/applied checks,
+production CSS build, and development-server startup passed. HTTP smoke checks
+verified the login redirect, anonymous API JSON 403, and locally served CSS/HTMX.
+The existing downloaded Tailwind executable and uv package cache were reused;
+fresh network downloading of that executable was not tested. The owned server
+was stopped and the temporary source/environment/database removed afterward.
+The current lockfile was used without modification; this session made no commit.
+
+The following maps every PRD acceptance criterion (and its associated stories)
+to deterministic tests; the numbered browser walkthrough above complements them.
+
+| PRD criterion | Evidence in `shows/` |
+| --- | --- |
+| 1: account administration/login/logout | `test_auth.py` |
+| 2: authentication, owner/staff isolation, HTMX expiry | `test_auth.py`, `test_htmx.py`, `test_api.py`, `test_api_actions.py` |
+| 3–4: discovery, fallbacks, blank/empty searches, retained failures | `test_discovery.py`, `test_tvmaze.py`, `test_htmx.py` |
+| 5–6: authoritative saves/defaults, duplicates and concurrent uniqueness | `test_entries.py`, `test_save_concurrency.py`, `test_api.py` |
+| 7: independent owner snapshots | `test_entries.py`, `test_refresh.py`, `test_api_actions.py` |
+| 8: outage independence and poster fallback | `test_entries.py`, `test_api_actions.py::test_local_website_api_workflow_during_provider_outage`; visual poster fallback in manual step 1 |
+| 9: refresh preservation and concurrent edits/deletion | `test_refresh.py`, `test_api_actions.py` |
+| 10–12: notes/rating/status/bookmark boundaries and independence | `test_personal.py`, `test_personal_migrations.py`, `test_api.py` |
+| 13: private stable local queries and pagination | `test_library.py`, `test_htmx.py`, `test_api.py` |
+| 14: confirmation, permanent deletion, fresh re-save | `test_deletion.py`, `test_api_actions.py` |
+| 15: complete REST contract, validation and CSRF | `test_api.py`, `test_api_actions.py` |
+| 16: provenance, escaping, optional metadata | `test_discovery.py`, `test_entries.py`, `test_api.py`, `test_refresh.py` |
+| 17: deterministic pytest plus separate console evidence | `shows/test_*.py`, `tests/test_tvmaze_console.py` |
+| 18: accumulated checks, locked clean setup, full workflow | Results recorded here; `test_api_actions.py::test_complete_website_api_workflow`, clean-setup smoke checks, manual steps 1–5 |
 
 ### Phase 4 browser verification
 
@@ -500,13 +638,14 @@ Actual final verification: **387 pytest tests and 13 subtests passed**, includin
 The separate seven-method console suite passed. Ruff lint and formatting
 (59 files), Django system checks, migration consistency and applied-migration
 checks, `uv sync --locked`, production CSS build, and diff whitespace checks
-passed. No new migration is required. Browser review is pending; no commit or
-Phase 6 implementation was made.
+passed. No new migration was required. Phase 5 was subsequently manually
+reviewed and accepted. These are the Phase 5 results; see Phase 6 above for the
+completed API actions and final verification.
 
 The API uses the same entries as the website. Sign in at `/accounts/login/`,
 then open `/api/entries/` for DRF's browsable API. JSON clients send
 `Accept: application/json` and `Content-Type: application/json`. Retain the
-`sessionid` and `csrftoken` cookies; every POST/PUT/PATCH also requires
+`sessionid` and `csrftoken` cookies; every POST/PUT/PATCH/DELETE also requires
 `X-CSRFToken` containing the current CSRF cookie value (login rotates it).
 There are no API tokens or public signup. Anonymous requests receive structured
 403 errors; another owner's ID and a missing ID both return 404, including staff.
@@ -552,9 +691,9 @@ provider missing show on creation returns 400 on `tvmaze_id`; other upstream,
 connection, malformed-data and ID-mismatch failures return 502. SQLite save
 contention returns retryable 503 with wait guidance. Provider failures have a
 safe `detail` message and never create partial records. Local reads/edits work
-without TVmaze. API refresh and DELETE belong to Phase 6 and are unavailable.
+without TVmaze. API refresh and DELETE are documented in the Phase 6 section above.
 
-Manual Phase 5 review (browser verification remains pending):
+Manual Phase 5 review (manually reviewed and accepted by the user):
 
 1. Run migrations, `uv run python -X utf8 manage.py tailwind build`, then
    `uv run python manage.py runserver`. Sign in and open `/api/entries/`.

@@ -346,10 +346,9 @@ def test_real_session_csrf(viewer, entry_factory, provider_http):
     provider_http[0].assert_not_called()
 
 
-def test_phase_six_actions_unavailable(viewer_client, entry_factory):
+def test_unsupported_detail_post_does_not_mutate(viewer_client, entry_factory):
     entry = entry_factory()
-    assert viewer_client.delete(url(entry)).status_code == 405
-    assert viewer_client.post(url(entry) + "refresh/").status_code == 404
+    assert viewer_client.post(url(entry)).status_code == 405
     assert Entry.objects.filter(pk=entry.pk).exists()
 
 

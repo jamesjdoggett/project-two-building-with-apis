@@ -2,7 +2,7 @@
 
 > Source PRD: [ShowVault](../prd/showvault.md).
 >
-> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1–5 have been implemented; Phase 5 awaits browser review. Phase 6 has not started. This session's changes remain uncommitted as requested.
+> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1–6 have been implemented. Phase 5 was manually reviewed and accepted; Phase 6 awaits final browser review. This session's changes remain uncommitted as requested.
 >
 > References: [progress prototype](../prototypes/watch-progress.html), [TVmaze research](../research/api-provider-comparison.md), and the adjacent [ATS implementation plan](../../applicant-tracking-system/plans/applicant-tracking-system.md).
 
@@ -202,6 +202,8 @@ Introduce DRF session-authenticated list/retrieve/create/PUT/PATCH endpoints ove
 ## Phase 6: REST API refresh/deletion and complete workflow verification
 
 **User stories**: 16, 17; applies 8, 15, 18. Final verification spans all stories 1–18.
+
+**Review status**: implemented and ready for user browser review; not committed or declared manually accepted. Added owner-scoped POST refresh and immediate DELETE, shared safe create/refresh error mapping, and strict empty-action validation. Both selected TDD behaviors failed on assertions (refresh 404 versus 200; deletion 405 versus 204) before passing; their relevant regression runs passed 123 and 24 tests respectively. Final verification: 437 pytest tests and 13 subtests passed, including 50 new Phase 6 tests, with the existing Windows cache-write warning. Seven console tests, Ruff lint/format (60 files), Django system/migration consistency/applied-migration checks, locked dependency sync, production CSS build, and whitespace checks passed. An isolated fresh environment/database also passed locked installation, all migrations, CSS build, server startup and login/API/static HTTP smoke checks, reusing package/Tailwind tool caches. README maps all 18 PRD criteria to deterministic coverage and provides the full browser demonstration and limitations. No schema or lockfile change was required; final browser acceptance is pending.
 
 ### What to build
 

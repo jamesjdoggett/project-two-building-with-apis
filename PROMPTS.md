@@ -1,5 +1,76 @@
 # PROMPTS.md — AI Usage Log
 
+## 2026-11-14 — ShowVault Phase 6 manual acceptance and final record
+
+### Prompts
+
+1. Implementation request (summary): "$implement Implement Phase 6 of the approved ShowVault implementation plan." Read AGENTS.md, the PRD, and plan; implement the exact phase while preserving Phases 1–5. Prioritize autonomy, choose recommended TDD approaches without routine checkpoints, run focused tests followed by full regression/Django/Ruff/migration checks, fix failures without weakening tests, and add durable AGENTS.md guidance only if needed. Provide actual results and manual instructions; do not commit before review and acceptance or begin additional features.
+2. The user supplied the implement skill text, including TDD, feedback loops, manual verification, and eventual logging/commit/push. The explicit autonomy and no-commit-before-review instructions controlled the implementation handoff.
+3. Acceptance and logging request (verbatim): "Phase 6 has been manually reviewed and accepted. Update PROMPTS.md with the actual Phase 6 implementation prompts, decisions, test results, manual verification, and any fixes made. Explicitly record that Phase 6 was manually reviewed and accepted.
+
+   Preserve all previous entries. Do not modify other files, run additional tests, or begin new features."
+
+### Decisions and implementation
+
+- Added owner-scoped `POST /api/entries/<id>/refresh/` using the existing shared authoritative refresh operation and immediate detail DELETE returning empty 204. Both enforce session authentication/CSRF and owner-scoped lookup, including staff. Actions accept no body or an empty object and reject submitted fields and query overrides.
+- Reused provider-only snapshot updates so concurrent personal edits survive, other owners' snapshots remain independent, and deletion during provider HTTP yields JSON 404 without resurrection. Extracted shared safe API error mapping: timeout 504; rate-limit/SQLite refresh contention 503 with wait guidance, `retry_after`, and `Retry-After`; other upstream failures/removal 502. Provider-404 during creation remains field-keyed 400. No raw provider bodies or secrets are returned.
+- Added 50 action/workflow tests covering successful and failed refresh preservation, independent snapshots, in-flight edits/deletion, immediate deletion/fresh re-save, ownership/staff isolation, anonymous errors, real-login session CSRF, rejected input/methods, website/API consistency, and outage independence. Updated the former Phase 5 future-action exclusion test to retain unsupported detail POST coverage now that refresh/DELETE are implemented.
+- Documented complete endpoint contracts, browser-console examples, five final manual scenarios, clean-setup evidence and limitations, and all 18 PRD acceptance criteria mapped to deterministic tests. Added two durable AGENTS.md instructions and Phase 6 plan review status. No schema, migration, dependency, or lockfile changes were required.
+
+### Actual tests and fixes
+
+- Refresh TDD RED returned 404 instead of 200; adding the authenticated refresh route and shared operation made it GREEN. The selected API/website-refresh regression run passed 123 tests.
+- Deletion TDD RED returned 405 instead of 204; owner-scoped DELETE made it GREEN, including empty response, preservation of the other owner's entry, and fresh re-save defaults. The selected deletion regression run passed 24 tests.
+- Focused action coverage passed 48 tests, then both added cross-surface/outage workflow tests passed. Final full regression result: **437 tests and 13 subtests passed**, including **50 new Phase 6 tests**. One existing Windows pytest-cache write warning remained; no tests were skipped or weakened.
+- The separate console suite passed all seven methods. Ruff lint/format (60 files), Django system checks, migration consistency/applied-migration checks, locked uv sync, production CSS build, and diff whitespace checks passed.
+- An isolated temporary source copy installed 22 packages from the unchanged uv lockfile into a fresh environment using Python 3.14.7. All migrations, system/migration checks, CSS build, server startup, and HTTP checks for login redirection, anonymous API JSON 403, and local CSS/HTMX passed. Existing package and Tailwind executable caches were reused; fresh executable download and live TVmaze availability were not tested. The owned server, temporary source/environment/database, and temporary verification helper were cleaned up.
+- Ruff identified long lines during development; formatting resolved them and final lint/format passed. There were no implementation test failures beyond the intended TDD red assertions. No additional implementation fixes were requested with acceptance.
+
+### Manual verification and acceptance
+
+- The supplied walkthrough covered discovery/save/edit and independent bookmark corrections; local queries/pagination; API edits visible on website reload; two ordinary users and staff isolation; HTMX authentication expiry and missing/invalid CSRF; successful API refresh and timeout/rate-limit/removal/malformed failures with saved-data preservation; API deletion and website absence; fresh re-save defaults; website delete cancel/confirm; and clean setup.
+- **The user explicitly confirmed that Phase 6 was manually reviewed and accepted.** No individual browser observations or new fixes were supplied with that confirmation, so none are invented. This acceptance supersedes the pending-review state recorded in the earlier implementation entry, which is preserved unchanged below.
+
+### Summary
+
+- **Outcome:** Phase 6 implementation, decisions, actual verification, and fixes are recorded; Phase 6 was manually reviewed and accepted by the user. All previous entries are preserved.
+- **Deviations:** autonomous TDD decisions followed the user's instructions. This acceptance update changes only PROMPTS.md; no additional tests, other file edits, commits, pushes, or new features.
+- **Sideways:** the implementation's formatting fixes, cache warning, and clean-setup cache limitations are recorded above. Acceptance logging introduced no implementation changes or new verification claims.
+
+## 2026-11-14 — ShowVault Phase 6 implementation for final review
+
+### Prompts
+
+1. `$implement` request (summary): implement exactly Phase 6 of the approved ShowVault plan after reading AGENTS.md, PRD, and plan, preserving Phases 1–5. Work autonomously, including recommended TDD decisions and red-green-refactor without routine approval pauses. Avoid unnecessary exploration and repeated checks. Run focused tests followed by full regressions, Django system checks, Ruff lint/format, and applicable migration checks; resolve failures without weakening tests. Add durable AGENTS.md instructions only if needed. Supply changes, actual test results, and clear manual instructions. Do not commit before review/acceptance or start additional features.
+2. The user supplied the implement skill text, requiring the local TDD workflow and final manual review. The user's explicit autonomous decisions override intermediate approval pauses; no commit/push occurs before acceptance.
+
+### Decisions and implementation
+
+- Added `POST /api/entries/<id>/refresh/` (`api:entry-refresh`) using the existing authoritative refresh operation, and immediate owner-scoped detail DELETE returning empty 204. Existing session authentication, authenticated-user permissions, and session CSRF apply. Owner-scoped lookup precedes action validation, including for staff. Actions accept no body or an empty object and reject client fields/query overrides; refresh cannot accept arbitrary URLs or snapshots.
+- Extracted shared API provider-error responses so create and refresh preserve consistent safe 504/503/502 behavior, with creation provider-404 remaining 400 and refresh removal becoming 502. Retryable 503 responses include wait guidance, `retry_after`, and `Retry-After`. Entry deletion during provider HTTP becomes JSON 404 without resurrection; personal edits made during HTTP survive through the existing provider-only update operation.
+- Added 50 Phase 6 tests for success, complete snapshot/provenance/personal preservation, independent snapshots, in-flight edits/deletion, all provider error classes, wait guidance, secret suppression, ordinary/staff ownership, anonymous access, actual-login CSRF, input/method rejection, fresh re-save, full website/API workflow, and provider-independent local operations. Replaced the former Phase 5 assertion that future actions were unavailable with an unsupported detail POST check; Phase 6 now deliberately implements those actions.
+- Documented the complete API contract, browser-console helper, five final manual scenarios, clean setup evidence/limitations, and coverage mapping for every PRD acceptance criterion in README. Added two durable AGENTS.md instructions and Phase 6 review status in the plan. No model, migration, dependency, or lockfile change was required.
+
+### TDD and actual verification
+
+- Selected two behaviors: API refresh must preserve an edit made during provider HTTP and another owner's snapshot; API deletion must immediately remove only the owned entry and re-save with fresh defaults. The tests clearly describe the observable privacy and preservation contracts. Chose the established shared operations without requesting routine decisions.
+- Refresh RED: endpoint returned 404 instead of expected 200. GREEN: the authenticated refresh route and existing shared operation made the test pass; 123 selected API/website-refresh regressions passed.
+- Deletion RED: detail DELETE returned 405 instead of expected 204. GREEN: owner-scoped deletion made it pass, including empty response, preservation of the other snapshot, and fresh re-save defaults; 24 selected action/website-deletion regressions passed.
+- Focused action coverage then passed 48 tests; the two added cross-surface/outage workflow tests passed separately. Final full suite: **437 tests and 13 subtests passed**, including **50 new Phase 6 tests**. One existing Windows pytest-cache write warning remained; no tests were skipped.
+- The separate seven-method console suite passed. Ruff lint/format (60 files), Django system checks, migration consistency and applied-migration checks, locked uv sync, production CSS build, and diff whitespace checks passed.
+- Verified a clean temporary source copy with a new virtual environment and database: `uv sync --locked` installed 22 packages using Python 3.14.7, all migrations applied, system/migration checks and CSS build passed, and the development server started. HTTP checks confirmed login redirection, anonymous API JSON 403, and local CSS/HTMX serving. Reused uv's package cache and the downloaded Tailwind executable; fresh executable download and live TVmaze availability were not tested. Stopped the owned server and removed the temporary environment/source/database and verification helper afterward.
+
+### Manual verification and review status
+
+- README's numbered walkthrough covers discovery/save/edit/bookmark independence/local controls/API updates reflected on the website; two ordinary users and staff isolation; HTMX authentication expiry and missing/invalid CSRF; successful API refresh followed by timeout/rate-limit/removal/malformed fixtures with preservation; API DELETE, website absence, fresh re-save, website cancel/confirm; and locked clean setup commands.
+- Browser visual behavior and the final manual walkthrough remain for the user to review. Automated HTTP checks are not claimed as a manual browser demonstration. Phase 5 was previously manually reviewed and accepted; this session does not claim Phase 6 acceptance.
+
+### Summary
+
+- **Outcome:** all approved Phase 6 functionality is implemented and automated verification passed; ready for final manual review, uncommitted. No additional features or commit/push.
+- **Deviations:** routine choices and TDD checkpoints proceeded autonomously as requested. Final acceptance remains pending.
+- **Sideways:** Ruff identified long lines before formatting; formatting resolved them and final lint/format passed. The existing Windows pytest-cache warning remains informational. No implementation test failures occurred beyond the intended TDD red assertions. The temporary clean setup reused tool/package caches as disclosed above.
+
 ## 2026-11-14 — ShowVault Phase 5 manual acceptance and implementation record
 
 ### Prompts

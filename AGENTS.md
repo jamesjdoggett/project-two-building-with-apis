@@ -37,3 +37,5 @@ Private TV show tracking website and REST API for discovering shows through TVma
 - Query fragments share `shows/templates/shows/fragments/`; use `shows.auth.login_required` for HTMX-aware login navigation. HTMX 2.0.8 is served locally with its license; personal mutations remain conventional forms.
 - Private API routes are namespaced `api:entry-list` and `api:entry-detail`; DRF uses session authentication and authenticated-user permissions, with session CSRF on writes.
 - API create accepts only integer `tvmaze_id`; PUT requires all `PERSONAL_FIELDS`, while PATCH validates the merged state. Reject extra fields rather than silently ignoring them.
+- API refresh is `api:entry-refresh` (POST); detail DELETE returns empty 204. Both accept no action fields/query overrides, enforce session CSRF, and perform owner-scoped lookup before action validation.
+- `shows.api.provider_failure` shares safe create/refresh error mappings; provider 404 is create 400 versus refresh 502, and retryable 503 responses include `retry_after` plus `Retry-After`.

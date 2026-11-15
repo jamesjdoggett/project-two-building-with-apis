@@ -3,6 +3,7 @@
 import requests
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.response import Response
@@ -10,7 +11,7 @@ from rest_framework.views import APIView
 
 from .library import library_entries
 from .models import Entry
-from .operations import SaveBusy, save_entry
+from .operations import SaveBusy, refresh_entry, save_entry
 from .personal import MAX_BOOKMARK_NUMBER, PERSONAL_FIELDS, validate_personal_fields
 from .tvmaze import ProviderError, RateLimited, ShowNotFound
 
@@ -70,6 +71,32 @@ class PersonalSerializer(StrictInput):
         return instance
 
 
+def provider_failure(exc, *, creating=False):
+    """Keep creation and refresh upstream contracts aligned without leaking data."""
+    if isinstance(exc, requests.Timeout):
+        return Response({"detail": "TVmaze timed out. Try again later."}, status=504)
+    if isinstance(exc, (RateLimited, SaveBusy)):
+        wait = exc.retry_after if isinstance(exc, RateLimited) else 1
+        message = (
+            str(exc)
+            if isinstance(exc, RateLimited)
+            else "The library is busy. Wait a moment, then retry."
+        )
+        return Response(
+            {"detail": message, "retry_after": wait},
+            status=503,
+            headers={"Retry-After": str(wait)},
+        )
+    if creating and isinstance(exc, ShowNotFound):
+        return Response(
+            {"tvmaze_id": ["No available TVmaze show has this ID."]}, status=400
+        )
+    return Response(
+        {"detail": "TVmaze returned unavailable or invalid data. Try again later."},
+        status=502,
+    )
+
+
 class EntryList(APIView):
     def get(self, request):
         entries, controls = library_entries(request.user, request.query_params)
@@ -93,42 +120,18 @@ class EntryList(APIView):
         serializer.is_valid(raise_exception=True)
         try:
             entry, created = save_entry(request.user, **serializer.validated_data)
-        except requests.Timeout:
-            return Response(
-                {"detail": "TVmaze timed out. Try again later."}, status=504
-            )
-        except RateLimited as exc:
-            return Response(
-                {"detail": str(exc), "retry_after": exc.retry_after},
-                status=503,
-                headers={"Retry-After": str(exc.retry_after)},
-            )
-        except ShowNotFound:
-            return Response(
-                {"tvmaze_id": ["No available TVmaze show has this ID."]}, status=400
-            )
-        except ProviderError:
-            return Response(
-                {
-                    "detail": (
-                        "TVmaze returned unavailable or invalid data. Try again later."
-                    )
-                },
-                status=502,
-            )
-        except SaveBusy:
-            return Response(
-                {
-                    "detail": "The library is busy. Wait a moment, then retry.",
-                    "retry_after": 1,
-                },
-                status=503,
-                headers={"Retry-After": "1"},
-            )
+        except (requests.Timeout, ProviderError, SaveBusy) as exc:
+            return provider_failure(exc, creating=True)
         return Response(EntrySerializer(entry).data, status=201 if created else 200)
 
 
 class EntryDetail(APIView):
+    def delete(self, request, pk):
+        entry = get_object_or_404(Entry, owner=request.user, pk=pk)
+        validate_action(request)
+        entry.delete()
+        return Response(status=204)
+
     def get(self, request, pk):
         return Response(
             EntrySerializer(get_object_or_404(Entry, owner=request.user, pk=pk)).data
@@ -145,3 +148,25 @@ class EntryDetail(APIView):
         serializer = PersonalSerializer(entry, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         return Response(EntrySerializer(serializer.save()).data)
+
+
+def validate_action(request):
+    """Actions take no client metadata, ownership, URLs, or query overrides."""
+    if request.query_params:
+        raise serializers.ValidationError(
+            {"detail": "This action takes no query parameters."}
+        )
+    StrictInput(data=request.data).is_valid(raise_exception=True)
+
+
+class EntryRefresh(APIView):
+    def post(self, request, pk):
+        get_object_or_404(Entry, owner=request.user, pk=pk)
+        validate_action(request)
+        try:
+            entry = refresh_entry(request.user, pk)
+        except Entry.DoesNotExist:
+            raise Http404 from None
+        except (requests.Timeout, ProviderError, SaveBusy) as exc:
+            return provider_failure(exc)
+        return Response(EntrySerializer(entry).data)
