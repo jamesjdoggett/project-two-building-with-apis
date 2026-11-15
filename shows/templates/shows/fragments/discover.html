@@ -1,0 +1,49 @@
+{% load static %}
+<section id="discover-panel" aria-label="Discover controls and results">
+<form method="get" hx-get="{% url 'shows:discover' %}" hx-target="#discover-panel" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#discover-loading" action="{% url 'shows:discover' %}" class="mb-6 max-w-2xl" data-search-form>
+  <label for="query" class="mb-2 block font-medium">Show title</label>
+  <div class="flex flex-wrap gap-3">
+    <input id="query" name="q" value="{{ query }}" class="input flex-1" placeholder="For example, Firefly">
+    <button class="btn btn-primary" type="submit">Search TVmaze</button>
+  </div>
+</form>
+{% if error %}<p class="alert alert-error mb-6" role="alert">{{ error }}</p>{% endif %}
+{% if searched %}
+  {% if results %}
+    <h2 class="mb-5 text-lg font-semibold">{{ results|length }} match{{ results|length|pluralize:"es" }} for “{{ query }}”</h2>
+    <div class="grid gap-5 md:grid-cols-2">
+      {% for show in results %}
+        <article class="card border border-base-300 bg-base-100 shadow-sm">
+          <div class="card-body">
+            <div class="flex items-start gap-5">
+              <img class="w-24 shrink-0 rounded bg-base-200" src="{% if show.poster_url %}{{ show.poster_url }}{% else %}{% static 'shows/poster-placeholder.svg' %}{% endif %}" alt="Poster for {{ show.title }}" width="96" height="144" loading="lazy" data-poster data-fallback="{% static 'shows/poster-placeholder.svg' %}">
+              <div class="min-w-0">
+                <h3 class="text-xl font-bold">{{ show.title }}</h3>
+                <p class="mb-3 text-sm text-base-content/70">{% if show.premiere_year %}Premiered {{ show.premiere_year }}{% else %}Premiere year unknown{% endif %}</p>
+                <p class="break-words">{{ show.summary }}</p>
+                <a class="link link-primary mt-3 inline-block" href="{{ show.source_url }}">View on TVmaze</a>
+                <form method="post" action="{% url 'shows:save' show.tvmaze_id %}" class="mt-4">
+                  {% csrf_token %}
+                  {% if show.tvmaze_id in saved_ids %}
+                    <span class="badge badge-success">Saved</span>
+                    <button class="btn btn-outline btn-sm" type="submit">Open saved entry</button>
+                  {% else %}
+                    <button class="btn btn-primary btn-sm" type="submit">Save to library</button>
+                  {% endif %}
+                </form>
+              </div>
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="rounded-box border border-base-300 bg-base-100 p-6" role="status">No shows found for “{{ query }}”. Try a different title.</p>
+  {% endif %}
+{% elif not error %}
+  <p class="rounded-box border border-base-300 bg-base-100 p-6">Enter a show title to start exploring.</p>
+{% endif %}
+<p class="mt-8 text-sm text-base-content/70">Show data from <a class="link" href="https://www.tvmaze.com/">TVmaze</a>, licensed under <a class="link" href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Summaries converted from HTML to plain text.</p>
+<p id="discover-loading" class="htmx-indicator mt-4" role="status">Searching TVmaze...</p>
+<p class="request-error alert alert-error mt-4" role="status" hidden>Could not load results. Check your connection and submit again.</p>
+</section>

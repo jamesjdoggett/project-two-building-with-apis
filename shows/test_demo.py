@@ -19,6 +19,7 @@ from .tvmaze import ProviderError, get_show, search_shows
         ("timeout", ""),
         ("no-results", ""),
         ("missing-data", ""),
+        ("removed", "unavailable"),
     ],
 )
 @override_settings(DEBUG=True)
@@ -54,7 +55,7 @@ def test_demo_is_not_available_with_debug_disabled():
         call_command("discovery_demo", "timeout", stdout=StringIO())
 
 
-@pytest.mark.parametrize("scenario", ["library", "invalid-detail"])
+@pytest.mark.parametrize("scenario", ["library", "invalid-detail", "refreshed"])
 @override_settings(DEBUG=True)
 def test_save_demo_has_search_cards_and_controlled_detail_responses(
     scenario, monkeypatch
@@ -69,8 +70,14 @@ def test_save_demo_has_search_cards_and_controlled_detail_responses(
                 get_show(shows[0].tvmaze_id)
         else:
             detail = get_show(shows[0].tvmaze_id)
-            assert detail["title"] == shows[0].title
-            assert detail["summary"] == "Local browser fixture & plain-text snapshot."
+            if scenario == "refreshed":
+                assert detail["title"] == shows[0].title + " refreshed"
+                assert detail["summary"] == "Updated provider snapshot."
+            else:
+                assert detail["title"] == shows[0].title
+                assert (
+                    detail["summary"] == "Local browser fixture & plain-text snapshot."
+                )
 
     with patch(
         "shows.management.commands.discovery_demo.call_command",

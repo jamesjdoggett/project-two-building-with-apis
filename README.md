@@ -2,9 +2,10 @@
 
 ShowVault now supports administrator-created ordinary accounts, session
 sign-in/sign-out, TVmaze discovery, authoritative show saving, and private local
-libraries, personal editing, and local search/filter/sort controls. Phase 3 is
-implemented and awaiting browser review. Refresh/deletion, HTMX, and REST endpoints
-remain in their approved later phases. This session has made no commits.
+libraries, personal editing, local search/filter/sort controls, explicit metadata
+refresh, confirmed deletion, and HTMX discovery/library interactions. Phase 4 is
+implemented and awaiting browser review. REST endpoints remain in Phases 5–6.
+This session has made no commits.
 
 ## Run the website
 
@@ -24,6 +25,86 @@ under Authentication and Authorization → Users. Give each a usable password;
 leave Staff status and Superuser status unchecked and Active checked. Sign out
 of admin, then use <http://127.0.0.1:8000/accounts/login/> for ordinary sign-in.
 Passwords are chosen locally; no demo accounts or fixed credentials are seeded.
+
+### Phase 4 browser verification
+
+Use two ordinary accounts and a staff account in separate browser profiles. Stop
+the running development server before switching demo scenarios. Every demo server
+uses `127.0.0.1:8000`, requires DEBUG, and mocks server-side provider HTTP only.
+Wait at least one second between discovery, save, and refresh, or follow the
+displayed cooldown; they deliberately share one throttle.
+
+1. Run `uv run python manage.py discovery_demo library`. Search `demo`, save a
+   show in each ordinary account, and give the first copy notes, a rating,
+   Completed status, and S0 E1. Record its title and successful retrieval time.
+   Stop the server and run `uv run python manage.py discovery_demo refreshed`.
+   On the first account's detail, choose **Refresh TVmaze metadata**. Expect the
+   title to gain `refreshed`, the summary to become **Updated provider snapshot.**,
+   and a newer retrieval time. Personal values and saved time stay unchanged;
+   the second account's snapshot stays unchanged.
+2. Stop/restart with each scenario: `timeout`, `rate-limit`, `removed`, and
+   `malformed`. Refresh the saved entry each time. Expect retry guidance (and
+   wait guidance for rate limiting), while all saved metadata, successful
+   retrieval time, and personal values remain unchanged. Under `timeout`, library
+   queries, detail, personal edits, and deletion must still work.
+3. Click **Delete entry**. Expect a confirmation naming the show and explaining
+   permanent loss of notes, rating, status, and bookmark. Click **Cancel** and
+   verify nothing changed. Reopen and choose **Permanently delete**: expect the
+   library, success feedback, and no entry. Restart the `library` fixture, search,
+   and save that show again: expect Planned, Unrated, blank notes, no bookmark.
+   Discovery's Saved indicator must disappear after deletion and return on save.
+4. With `library` running, search/save up to 21 demo shows. In My library combine
+   a title query, Planned status, and each sort; use Next/Previous. Expect 20
+   entries then one, retained controls, and a URL matching the current page.
+   Requests update only the controls/results panel. Test Back/Forward, Reset,
+   no matches, and a fresh account's empty library. Discovery retains its query
+   after errors. In DevTools Network, throttle the connection to see loading
+   feedback (the deterministic timeout fixture fails immediately). Block
+   `/discover/?*` in DevTools to check request-failure feedback and retry.
+5. Disable JavaScript and repeat discovery, local filtering/pagination, refresh,
+   and cancel/confirm deletion. Expect usable conventional pages and forms.
+   Re-enable JavaScript. Leave a library/discovery tab open, sign out in another
+   tab, then submit its controls: expect full navigation to login, with the
+   attempted URL retained in `next`, rather than login inside the results.
+6. As the second account and staff on ordinary website routes, try the first
+   account's `/library/<id>/delete/` and POST refresh/delete URLs: expect 404 and
+   no change. GET `/library/<owned-id>/refresh/` must return 405. For CSRF, use
+   DevTools `fetch('/library/<owned-id>/refresh/', {method: 'POST'})`: expect 403;
+   repeat with the delete URL. Normal form submissions succeed with their token.
+
+HTMX 2.0.8 and its Zero-Clause BSD license are stored in `static/shows/`; no CDN
+is needed. Shared fragments include controls, results, loading, and feedback.
+Browser history caching is disabled so private fragments are not stored in
+HTMX's localStorage history cache. Provider summaries and notes remain escaped,
+and swapped posters use the same local failure placeholder as initial pages.
+Browser verification remains pending; automated tests do not establish visual
+layout, keyboard behavior, or actual browser navigation.
+
+### Phase 4 automated verification
+
+The three selected TDD behaviors reached assertion failures before passing:
+preserving an edit during refresh HTTP, returning 404 after deletion during
+refresh HTTP without resurrection, and full login navigation for expired HTMX
+sessions. Other tests cover complete failure preservation, independent snapshots,
+optional metadata, shared throttling, CSRF, methods, forged payloads, ordinary and
+staff ownership, confirmed deletion/re-save defaults, fragment parity, normalized
+controls, pagination, empty states, saved indicators, and discovery failures.
+
+Actual final results:
+
+- `uv run pytest`: **286 passed**, including **60 new Phase 4 tests**.
+- `uv run python -m unittest discover -s tests -v`: **7 passed**.
+- `uv run ruff check .`: passed; `uv run ruff format --check .`: **56 files** formatted.
+- `uv run python manage.py check`: no issues.
+- `uv run python manage.py makemigrations --check --dry-run`: no changes detected.
+- `uv run python manage.py migrate --check`: passed; no unapplied migrations.
+- `uv run python -X utf8 manage.py tailwind build`: production stylesheet built.
+- `git diff --check`: passed.
+
+Checks used a workspace-local `UV_CACHE_DIR` because the sandbox denied access
+to the default uv cache; the CSS executable required execution outside the sandbox.
+No model change or new migration is needed. Manual review remains pending;
+Phase 5 has not started. No commit or push was made.
 
 ### Phase 3 browser verification
 

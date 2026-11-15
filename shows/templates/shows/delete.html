@@ -1,0 +1,12 @@
+{% extends 'shows/base.html' %}
+{% block title %}Delete {{ entry.title }} | ShowVault{% endblock %}
+{% block content %}
+<h1 class="mb-4 text-3xl font-bold">Delete {{ entry.title }}?</h1>
+{% if error %}<p class="alert alert-error mb-4" role="alert">{{ error }}</p>{% endif %}
+<p class="mb-6">This permanently deletes this saved show, including your notes, rating, watch status, and season/episode bookmark. There is no restore. Saving it again starts fresh as Planned, Unrated, with blank notes and no bookmark.</p>
+<form method="post" action="{% url 'shows:delete' entry.pk %}" class="flex gap-4">
+  {% csrf_token %}
+  <button class="btn btn-error" type="submit">Permanently delete</button>
+  <a class="btn btn-ghost" href="{% url 'shows:detail' entry.pk %}">Cancel</a>
+</form>
+{% endblock %}

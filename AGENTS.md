@@ -33,3 +33,5 @@ Private TV show tracking website and REST API for discovering shows through TVma
 - Reuse `shows.operations.save_entry(owner, tvmaze_id)`, returning `(entry, created)`; owned duplicates bypass HTTP, database uniqueness recovers collisions, and `SaveBusy` requires explicit retry feedback for SQLite locks. Never hold a write transaction during provider HTTP.
 - Personal validation lives in `shows/personal.py`: pass the complete parsed personal state to `validate_personal_fields`; `PERSONAL_FIELDS` defines the editable field allowlist.
 - Reuse `shows.library.library_entries(owner, params)` for owner-scoped local lists; it returns the ordered queryset and normalized `q`, `status`, and `sort` controls.
+- Reuse `shows.operations.refresh_entry(owner, pk)` for validated provider refreshes; it updates snapshot fields only after HTTP and raises `Entry.DoesNotExist` if deletion wins, preserving concurrent personal edits.
+- Query fragments share `shows/templates/shows/fragments/`; use `shows.auth.login_required` for HTMX-aware login navigation. HTMX 2.0.8 is served locally with its license; personal mutations remain conventional forms.

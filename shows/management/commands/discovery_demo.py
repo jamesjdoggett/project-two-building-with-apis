@@ -21,6 +21,8 @@ class Command(BaseCommand):
                 "missing-data",
                 "library",
                 "invalid-detail",
+                "refreshed",
+                "removed",
             ],
         )
 
@@ -30,12 +32,20 @@ class Command(BaseCommand):
         scenario = options["scenario"]
         response = MagicMock(status_code=200, headers={})
         response.__enter__.return_value = response
+
+        def check_status():
+            if response.status_code >= 400:
+                raise requests.HTTPError(response=response)
+
+        response.raise_for_status.side_effect = check_status
         response.json.return_value = []
         if scenario == "rate-limit":
             response.status_code = 429
             response.headers = {"Retry-After": "5"}
         elif scenario == "malformed":
             response.json.return_value = {"unexpected": "shape"}
+        elif scenario == "removed":
+            response.status_code = 404
         elif scenario == "missing-data":
             response.json.return_value = [
                 {
@@ -59,7 +69,7 @@ class Command(BaseCommand):
             f"Demo: {scenario}. No live TVmaze requests. Stop with Ctrl+C."
         )
         fixtures = response.json.return_value
-        if scenario in {"library", "invalid-detail"}:
+        if scenario in {"library", "invalid-detail", "refreshed"}:
             fixtures = [
                 {
                     "show": {
@@ -78,7 +88,7 @@ class Command(BaseCommand):
         def fixture_response(url, **kwargs):
             if scenario == "timeout":
                 raise requests.Timeout()
-            if scenario in {"library", "invalid-detail", "missing-data"}:
+            if scenario in {"library", "invalid-detail", "missing-data", "refreshed"}:
                 if "/search/shows" in url:
                     response.json.return_value = fixtures
                 elif scenario == "invalid-detail":
@@ -93,6 +103,15 @@ class Command(BaseCommand):
                         ),
                         {},
                     )
+                    if scenario == "refreshed" and response.json.return_value:
+                        response.json.return_value = {
+                            **response.json.return_value,
+                            "name": response.json.return_value["name"] + " refreshed",
+                            "summary": "<p>Updated provider snapshot.</p>",
+                            "genres": ["Drama"],
+                            "language": "English",
+                            "status": "Ended",
+                        }
             return response
 
         with patch(

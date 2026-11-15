@@ -2,21 +2,97 @@ from urllib.parse import urlencode
 
 import requests
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import (
     require_http_methods,
     require_POST,
     require_safe,
 )
+from django.views.decorators.vary import vary_on_headers
 
+from .auth import login_required
 from .forms import PersonalForm
 from .library import SORT_CHOICES, library_entries
 from .models import Entry
-from .operations import SaveBusy, save_entry
+from .operations import SaveBusy, refresh_entry, save_entry
 from .personal import PERSONAL_FIELDS, WATCH_STATUSES
 from .tvmaze import ProviderError, RateLimited, ShowNotFound, search_shows
+
+
+@login_required
+@require_POST
+def refresh(request, pk):
+    entry = get_object_or_404(Entry.objects.filter(owner=request.user), pk=pk)
+    if not action_form_valid(request):
+        return render(
+            request,
+            "shows/detail.html",
+            {
+                "entry": entry,
+                "error": "Submit this action using its form, with no extra fields.",
+            },
+            status=400,
+        )
+    try:
+        entry = refresh_entry(request.user, pk)
+    except Entry.DoesNotExist:
+        raise Http404 from None
+    except requests.Timeout:
+        error, status = (
+            "TVmaze timed out. Your saved data is unchanged. "
+            "Try refreshing again later.",
+            504,
+        )
+    except (RateLimited, SaveBusy) as exc:
+        error, status = str(exc), 503
+    except ProviderError as exc:
+        error, status = (
+            f"{exc} Your saved data is unchanged. Try refreshing again later.",
+            502,
+        )
+    else:
+        messages.success(
+            request, "TVmaze metadata refreshed. Your viewing details are unchanged."
+        )
+        return redirect("shows:detail", pk=entry.pk)
+    return render(
+        request, "shows/detail.html", {"entry": entry, "error": error}, status=status
+    )
+
+
+def action_form_valid(request):
+    return (
+        request.content_type
+        in {"application/x-www-form-urlencoded", "multipart/form-data"}
+        and not (set(request.POST) - {"csrfmiddlewaretoken"})
+        and not request.GET
+        and not request.FILES
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def delete(request, pk):
+    entry = get_object_or_404(Entry.objects.filter(owner=request.user), pk=pk)
+    if request.method == "POST":
+        if not action_form_valid(request):
+            return render(
+                request,
+                "shows/delete.html",
+                {
+                    "entry": entry,
+                    "error": "Confirm deletion using this form, with no extra fields.",
+                },
+                status=400,
+            )
+        entry.delete()
+        messages.success(
+            request, "The entry and its personal data were permanently deleted."
+        )
+        return redirect("shows:library")
+    return render(request, "shows/delete.html", {"entry": entry})
 
 
 @login_required
@@ -106,6 +182,7 @@ def home(request):
     return redirect("shows:library")
 
 
+@vary_on_headers("HX-Request")
 @login_required
 @require_safe
 def library(request):
@@ -113,7 +190,9 @@ def library(request):
     page = Paginator(entries, 20).get_page(request.GET.get("page"))
     return render(
         request,
-        "shows/library.html",
+        "shows/fragments/library.html"
+        if request.headers.get("HX-Request") == "true"
+        else "shows/library.html",
         {
             "page_obj": page,
             "query": controls["q"],
@@ -127,6 +206,7 @@ def library(request):
     )
 
 
+@vary_on_headers("HX-Request")
 @login_required
 @require_safe
 def discover(request):
@@ -149,7 +229,9 @@ def discover(request):
     )
     return render(
         request,
-        "shows/discover.html",
+        "shows/fragments/discover.html"
+        if request.headers.get("HX-Request") == "true"
+        else "shows/discover.html",
         {
             "query": query,
             "results": results,

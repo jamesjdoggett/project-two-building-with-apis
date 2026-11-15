@@ -1,5 +1,80 @@
 # PROMPTS.md — AI Usage Log
 
+## 2026-11-14 — ShowVault Phase 4 implementation and approval
+
+### Prompts
+
+User prompts are recorded in conversation order. The long implementation request
+is explicitly summarized; the current logging and approval request is verbatim.
+
+1. The user supplied AGENTS.md instructions and the repository environment: follow the approved ShowVault PRD/plan, Python 3.14/Django/SQLite/uv stack, private owner-scoped access, shared provider/save/personal/library operations, and required checks.
+2. Initial `$implement` request (summary): implement Phase 4 of the approved ShowVault plan after reading AGENTS.md, the PRD, and plan, following its exact scope and acceptance criteria. Work autonomously, including recommended TDD choices and full red-green-refactor cycles without routine confirmation pauses. Ask only about material requirement changes or significant risks. Preserve Phases 1–3, fix failures, run required automated tests, Django checks, Ruff checks, and applicable migration checks, avoid redundant exploration/checks, add only needed durable AGENTS.md guidance in 1–7 lines, and supply concise manual verification steps. Do not begin Phase 5, change unrelated features, or commit; stop for final review.
+3. The user supplied the implement skill text. It delegates to the local TDD skill, normally requires intermediate approval checkpoints and manual acceptance, and eventually calls for logging/commit/push. The user's explicit autonomous-TDD and no-commit instructions overrode the intermediate pauses and commit/push steps; browser review remained the handoff boundary.
+4. "Update PROMPTS.md with the actual Phase 4 implementation prompts, decisions, test results, manual verification, and fixes. Preserve previous entries. Do not modify other files or run tests. Phase 4 has been approved,"
+
+### Exploration, implementation, and decisions
+
+- Read AGENTS.md, the implement/TDD skills, PRD, approved plan, and relevant existing models, operations, views, routes, templates, provider client, fixtures, tests, configuration, and README. Implemented only Phase 4: explicit provider refresh, confirmed website deletion, and HTMX discovery/library queries. No REST endpoints or Phase 5 work were added.
+- Added shared `shows.operations.refresh_entry(owner, pk)`. Fetch and validate the complete authoritative snapshot before writing, with no write transaction spanning provider HTTP. Use an owner-scoped queryset update containing provider fields and retrieval/update timestamps only, then reload the entry. This preserves personal edits made while HTTP is in flight and cannot insert a deleted entry. A deletion winning the race raises `Entry.DoesNotExist`, translated to website 404. SQLite write locks offer explicit retry feedback through `SaveBusy`.
+- Added authenticated, CSRF-protected POST refresh with timeout 504, rate-limit/busy 503, and provider failure/removal 502 feedback. Failed provider validation leaves every saved field and timestamp unchanged. The existing detail client checks identity and all required metadata; missing optional metadata remains valid. Search, new save, and refresh share the existing request gate; no automatic retries or background refresh were added.
+- Added an owner-scoped deletion confirmation naming the show and explaining permanent loss of notes, rating, status, and bookmark. GET and Cancel preserve data; protected POST deletes and redirects to the library. Re-saving creates fresh Planned/Unrated/blank-note/no-bookmark defaults. Refresh and deletion reject extra fields, query overrides, JSON, and files, and remain conventional page/form flows alongside personal editing.
+- Downloaded pinned HTMX 2.0.8 and its Zero-Clause BSD license from the official repository into `static/shows/`. Discovery and library full pages include the same fragments used for HTMX responses; fragments include normalized controls, results, feedback, and loading indicators. Enhanced submitted GET forms and library pagination/reset while preserving ordinary submissions and links. Responses vary on `HX-Request`.
+- Added `shows.auth.login_required`, preserving ordinary login redirects while returning an empty HTTP 200 with `HX-Redirect` for expired fragment sessions. Disabled HTMX history caching and configured history restores as full-page requests. Updated poster fallback for swapped content, request-failure feedback, and loading/busy handling. Added CSS so idle loading messages are hidden even with JavaScript disabled.
+- Added `refreshed` and `removed` scenarios to the DEBUG-only loopback demo server, alongside existing timeout/rate-limit/malformed/library fixtures. Changed-metadata fixtures update provider text without changing stored personal data; removal fixtures return HTTP 404. No accounts or entries are automatically seeded.
+- Updated README with implementation/check results and exact browser scenarios, recorded pending browser review in the plan, rebuilt production CSS, and added two durable AGENTS.md lines identifying shared refresh behavior and HTMX authentication/fragments. No model, migration, dependency declaration, or lockfile changes were needed. No commit or push was made.
+
+### Actual automated verification
+
+| Check | Observed result |
+| --- | --- |
+| Personal-edit preservation TDD RED | Refresh scaffold returned the old entry; assertion expected `Refreshed title` but found `Firefly`. The test also requires the personal edit performed during the mocked HTTP callback, Completed/S0 E1 state, and original creation time to survive. |
+| First behavior GREEN and regressions | 123 passed after updating only provider fields and reloading current data. |
+| Deletion-during-HTTP TDD RED | Refresh returned HTTP 500 from an uncaught `Entry.DoesNotExist`; the test expected 404 and no recreated row. |
+| Deletion behavior GREEN | Translating the missing entry to Http404 made both refresh tests pass; no insertion or resurrection occurs. |
+| Expired-session TDD RED | Both discovery and library fragment requests returned normal HTTP 302 redirects; expected empty HTTP 200 responses with login `HX-Redirect` retaining the attempted query. |
+| Selected behaviors and query regressions | 39 passed across refresh, HTMX, existing discovery, and library tests after the HTMX-aware authentication wrapper and shared fragments were added. |
+| Expanded phase run | 57 passed, 1 failed: full/fragment byte comparison differed because Django masks CSRF tokens differently per render. Normalized token values in the comparison without changing the behavior asserted. |
+| First full suite | 285 passed, 1 failed in 68.05 seconds: the new removal demo's MagicMock did not raise HTTPError for its 404, producing unexpected-response feedback instead of the expected unavailable feedback. |
+| Demo correction check | 10 demo tests passed after making fixture `raise_for_status` raise for HTTP errors. |
+| Final `uv run pytest` | **286 passed in 68.94 seconds**, including **60 new Phase 4 tests** and accumulated Phases 1–3 coverage. No pytest warning was reported in this final output. |
+| Separate console runner | `uv run python -m unittest discover -s tests -v`: **7 test methods passed**, OK. These methods are also collected by pytest, not seven additional distinct tests. |
+| Django system check | `uv run python manage.py check`: no issues, 0 silenced. |
+| Migration consistency | `uv run python manage.py makemigrations --check --dry-run`: No changes detected. |
+| Applied-migration check | `uv run python manage.py migrate --check`: exit 0; no unapplied migrations. No Phase 4 migration was created or applied. |
+| Ruff lint/format | Final `uv run ruff check .`: All checks passed. `uv run ruff format --check .`: **56 files already formatted**. |
+| Production CSS | `uv run python -X utf8 manage.py tailwind build`: production stylesheet built successfully, including the final JavaScript-disabled loading-indicator correction. |
+| Whitespace | Final `git diff --check`: no whitespace errors; Git emitted LF-to-CRLF notices. |
+
+Additional passing coverage includes successful complete snapshot replacement,
+unchanged other-owner snapshots/personal fields/creation time, timeout,
+connection, removal, rate limiting, 5xx, redirect, JSON/shape/ID/required-field
+failures, optional metadata, shared throttling, confirmation/cancel/deletion,
+fresh re-save defaults, owner/staff/superuser isolation, anonymous access, methods,
+real session CSRF, forged inputs, full/fragment parity, query retention, 20/1
+pagination, empty states, no-provider local operations, and saved indicators.
+Refresh race tests deliberately interleave an edit or deletion in the mocked
+HTTP callback; they are not claims of new multithreaded refresh testing. Existing
+separate-connection save-concurrency coverage remains in the full suite.
+
+### Manual verification, fixes, and limitations
+
+- Supplied numbered browser steps using two ordinary accounts and staff in separate profiles. Start `discovery_demo library`, save the same show independently, add notes/rating/Completed/S0 E1, then restart with `refreshed` and refresh only one copy. Expect changed title/summary and successful retrieval time, unchanged personal values/saved time, and an unchanged second owner's snapshot.
+- Documented switching to `timeout`, `rate-limit`, `removed`, and `malformed`, refreshing, and comparing all saved values and timestamps. Local library/detail/edit/delete must remain usable during provider failure. Each provider action shares the one-second gate, with displayed cooldown guidance and explicit retries.
+- Documented opening and cancelling deletion, confirming permanent deletion, checking library absence and discovery indicators, and re-saving for fresh defaults. Included 21-show combined title/status/sort pagination, retained controls and URLs, Back/Forward, Reset, no matches, and an empty account.
+- Included JavaScript-enabled/disabled discovery, local queries, refresh, and deletion; DevTools network throttling for loading feedback and request blocking for failure feedback; signing out in a second tab before fragment submission for full login navigation; foreign ordinary/staff 404s; GET refresh 405; and missing-CSRF POST 403 checks.
+- Browser verification was pending at implementation handoff. The current user explicitly approves Phase 4. No individual browser observations, screenshots, or new post-review defects were supplied, and no agent-performed interactive browser verification is claimed. Detailed expected results remain in README.
+- The default uv cache was inaccessible. The first TDD command failed before running tests; subsequent commands used workspace-local `UV_CACHE_DIR`. This cache-access failure is not counted as TDD RED; the later assertion failure is.
+- The initial HTMX download failed to connect inside the sandbox; the escalated download succeeded. The license download also succeeded with escalation. The existing Tailwind executable initially failed with Windows access denied; escalated builds succeeded. No failed build/download is counted as a successful check.
+- One attempted `uv run python -c` edit failed with shell quoting/SyntaxError and made no change; the edit was applied with a patch. A later transform using the system `python.exe` alias could not execute; the existing virtual-environment interpreter succeeded. One patch attempting delete/add on the same JavaScript path was rejected before application; the file was subsequently rewritten successfully.
+- Ruff initially found import ordering and long lines. Auto-fix/format addressed the imports and most wrapping; the remaining long timeout string was split, and final lint/format passed. The three intended TDD failures, CSRF comparison mismatch, and demo HTTP behavior mismatch were corrected as described above. Idle loading messages were explicitly hidden in CSS for JavaScript-disabled pages, followed by a successful rebuild.
+- This logging follow-up changes **only PROMPTS.md** and preserves previous entries. It records prior observed results without running tests, checks, builds, or modifying other files.
+
+### Summary
+
+- **Outcome:** Phase 4 implemented and now approved by the user; 286 accumulated pytest tests, the separate seven-method console suite, required checks, and CSS build passed. Refresh preserves data under failures/interleaved edits/deletion, deletion requires confirmation, and discovery/library work through shared HTMX and ordinary flows. No Phase 5 work, commit, or push was performed.
+- **Deviations:** the user explicitly authorized autonomous TDD decisions and removed routine intermediate approval pauses; the explicit no-commit instruction overrode the skill's finish step. The current request authorizes only this log update and confirms Phase 4 approval.
+- **Sideways:** sandbox cache/network/executable access, shell quoting/interpreter failures, and one rejected patch required recovery. Tests caught dynamic CSRF-token comparison and an incomplete demo HTTP mock; both were fixed, and the full suite then passed. Manual acceptance is user-provided approval, not invented browser evidence.
+
 ## 2026-11-14 — ShowVault Phase 3 implementation and approval
 
 ### Prompts

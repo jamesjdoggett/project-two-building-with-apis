@@ -2,7 +2,7 @@
 
 > Source PRD: [ShowVault](../prd/showvault.md).
 >
-> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1 and 2 have been implemented; Phase 3 is implemented and awaiting browser review. Phases 4–6 have not started. Phase 3 changes remain uncommitted as requested.
+> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1–4 have been implemented; Phase 4 awaits browser review. Phases 5–6 have not started. This session's changes remain uncommitted as requested.
 >
 > References: [progress prototype](../prototypes/watch-progress.html), [TVmaze research](../research/api-provider-comparison.md), and the adjacent [ATS implementation plan](../../applicant-tracking-system/plans/applicant-tracking-system.md).
 
@@ -135,6 +135,8 @@ Add personal fields and suitable constraints with a usable edit form: rating, pl
 ## Phase 4: Refresh, deletion, and HTMX interactions
 
 **User stories**: 8, 15, 18; extends 3, 4, 7, 14, 17 and session behavior in 2.
+
+**Review status**: implemented and awaiting user browser verification; not declared complete or committed. All three selected TDD behaviors failed on assertions before passing: refresh preserves personal edits made during HTTP, deletion during HTTP produces 404 without resurrection, and expired HTMX requests navigate to login. Final results: 286 pytest tests pass (60 new Phase 4 tests), the separate 7-method console suite passes, Ruff lint/format (56 files), Django system checks, migration consistency and applied-migration checks, production CSS build, and diff whitespace check pass. No new migration is needed. README includes controlled changed-metadata/removal/failure fixtures and full browser scenarios. Manual verification is pending; Phase 5 has not started.
 
 ### What to build
 

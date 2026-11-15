@@ -1,0 +1,60 @@
+{% load static %}
+<section id="library-panel" aria-label="Library controls and results">
+<form method="get" hx-get="{% url 'shows:library' %}" hx-target="#library-panel" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#library-loading" action="{% url 'shows:library' %}" class="mb-6 flex flex-wrap items-end gap-4">
+  <div class="flex-1">
+    <label class="mb-2 block font-semibold" for="library-query">Search saved titles</label>
+    <input class="input w-full" type="search" id="library-query" name="q" value="{{ query }}">
+  </div>
+  <div>
+    <label class="mb-2 block font-semibold" for="library-status">Watch status</label>
+    <select class="select" id="library-status" name="status">
+      <option value=""{% if not selected_status %} selected{% endif %}>All statuses</option>
+      {% for value, label in status_choices %}<option value="{{ value }}"{% if selected_status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="mb-2 block font-semibold" for="library-sort">Sort</label>
+    <select class="select" id="library-sort" name="sort">
+      {% for value, label in sort_choices %}<option value="{{ value }}"{% if selected_sort == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a hx-boost="true" hx-target="#library-panel" hx-swap="outerHTML" hx-push-url="true" class="btn btn-ghost" href="{% url 'shows:library' %}">Reset</a>
+</form>
+{% if page_obj.object_list %}
+  <p class="mb-5">{{ page_obj.paginator.count }} matching saved show{{ page_obj.paginator.count|pluralize }}</p>
+  <div class="grid gap-5 md:grid-cols-2">
+    {% for entry in page_obj %}
+      <article class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body">
+          <div class="flex items-start gap-5">
+            <img class="w-24 shrink-0 rounded bg-base-200" src="{% if entry.poster_url %}{{ entry.poster_url }}{% else %}{% static 'shows/poster-placeholder.svg' %}{% endif %}" alt="Poster for {{ entry.title }}" width="96" height="144" loading="lazy" data-poster data-fallback="{% static 'shows/poster-placeholder.svg' %}">
+            <div class="min-w-0">
+              <h2 class="mb-2 break-words text-xl font-bold"><a class="link link-primary" href="{% url 'shows:detail' entry.pk %}">{{ entry.title }}</a></h2>
+              <p>{% if entry.premiered %}Premiered {{ entry.premiered|date:'Y' }}{% else %}Premiere year unknown{% endif %}</p>
+              <p class="mt-2">{{ entry.get_watch_status_display }} · {% if entry.rating %}{{ entry.rating }} / 10{% else %}Unrated{% endif %}</p>
+              <p class="mt-3 break-words">{{ entry.summary|truncatewords:40 }}</p>
+              <p class="mt-3 text-sm">Data from <a class="link" href="{{ entry.source_url }}">{{ entry.provider_name }}</a>, <a class="link" href="{{ entry.license_url }}">CC BY-SA 4.0</a>. {{ entry.summary_transformation }}</p>
+            </div>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+  {% if page_obj.has_other_pages %}
+    <nav hx-boost="true" hx-target="#library-panel" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#library-loading" class="mt-6 flex items-center gap-4" aria-label="Library pages">
+      {% if page_obj.has_previous %}<a class="btn btn-outline btn-sm" href="?{{ pagination_query }}&amp;page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="btn btn-outline btn-sm" href="?{{ pagination_query }}&amp;page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+    </nav>
+  {% endif %}
+{% else %}
+  {% if has_entries %}
+  <p class="rounded-box border border-base-300 bg-base-100 p-6">No saved shows match these filters. Try another title or status, or <a class="link link-primary" href="{% url 'shows:library' %}">reset your filters</a>.</p>
+  {% else %}
+  <p class="rounded-box border border-base-300 bg-base-100 p-6">Your library is empty. <a class="link link-primary" href="{% url 'shows:discover' %}">Discover shows</a> to save your first show.</p>
+  {% endif %}
+{% endif %}
+<p id="library-loading" class="htmx-indicator mt-4" role="status">Updating your library...</p>
+<p class="request-error alert alert-error mt-4" role="status" hidden>Could not load results. Check your connection and submit again.</p>
+</section>

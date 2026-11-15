@@ -10,4 +10,6 @@ urlpatterns = [
     path("discover/<int:tvmaze_id>/save/", views.save_show, name="save"),
     path("library/<int:pk>/", views.detail, name="detail"),
     path("library/<int:pk>/edit/", views.edit, name="edit"),
+    path("library/<int:pk>/refresh/", views.refresh, name="refresh"),
+    path("library/<int:pk>/delete/", views.delete, name="delete"),
 ]

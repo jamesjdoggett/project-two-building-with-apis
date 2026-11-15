@@ -3,6 +3,13 @@
 {% block title %}{{ entry.title }} | ShowVault{% endblock %}
 {% block content %}
 <a class="link mb-5 inline-block" href="{% url 'shows:library' %}">Back to my library</a>
+{% if error %}<p class="alert alert-error mb-5" role="alert">{{ error }}</p>{% endif %}
+<div class="mb-5 flex flex-wrap gap-4">
+  <form method="post" action="{% url 'shows:refresh' entry.pk %}">
+    {% csrf_token %}<button class="btn btn-outline" type="submit">Refresh TVmaze metadata</button>
+  </form>
+  <a class="btn btn-error btn-outline" href="{% url 'shows:delete' entry.pk %}">Delete entry</a>
+</div>
 <article class="card border border-base-300 bg-base-100 shadow-sm">
   <div class="card-body gap-5">
     <div class="flex flex-wrap items-start gap-6">
