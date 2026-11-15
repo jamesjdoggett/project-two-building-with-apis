@@ -207,6 +207,7 @@ tempCodeRunnerFile.py
 
 # Ruff stuff:
 .ruff_cache/
+.django_tailwind_cli/
 
 # PyPI configuration file
 .pypirc

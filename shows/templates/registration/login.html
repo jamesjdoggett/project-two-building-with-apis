@@ -1,0 +1,20 @@
+{% extends 'shows/base.html' %}
+{% block title %}Sign in | ShowVault{% endblock %}
+{% block content %}
+<section class="card mx-auto max-w-md border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-5">
+    <h1 class="card-title text-3xl">Sign in to ShowVault</h1>
+    <p>Discover your next show with your private account.</p>
+    {% if form.errors %}<p class="alert alert-error" role="alert">Your username or password was not accepted. Check your details and try again.</p>{% endif %}
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% for field in form %}
+        <div><label class="mb-2 block font-medium" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>
+      {% endfor %}
+      <button class="btn btn-primary w-full" type="submit">Sign in</button>
+    </form>
+    <p class="text-sm text-base-content/70">Need an account or password help? Contact your administrator.</p>
+  </div>
+</section>
+{% endblock %}

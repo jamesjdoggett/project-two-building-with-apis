@@ -3,10 +3,25 @@ name = "project-two-building-with-apis"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
+    "django>=5.2,<5.3",
+    "django-tailwind-cli>=4.8.2",
     "requests>=2.34.2",
 ]
 
 [dependency-groups]
 dev = [
+    "pytest>=9.2.0",
+    "pytest-django>=4.14.0",
     "ruff>=0.17.5",
 ]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+testpaths = ["tests", "shows"]
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

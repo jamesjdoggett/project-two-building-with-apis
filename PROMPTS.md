@@ -1,5 +1,66 @@
 # PROMPTS.md — AI Usage Log
 
+## 2026-11-14 — ShowVault Phase 1 implementation and review
+
+### Prompts
+
+User prompts are recorded below in conversation order. Long documentation requests are explicitly summarized; short approvals are verbatim.
+
+1. Initial AGENTS.md request (summary): create a root guidance file following ATS's incremental approach, between 20 and 30 lines, with application description, approved stack, uv workflow, confirmed architecture, and actual PRD/plan/research/prototype references. Avoid duplicated requirements, speculative guidance, unverified commands, and rejected options. During implementation preserve only verified project-wide conventions with small additions; implement no features yet and report the line count.
+2. "$implement Implement Phase 1 of the approved implementation plan for our TV show tracking application. Read AGENTS.md, the approved PRD, implementation plan, and relevant prototype decisions before making changes. Follow the established technology stack and use the existing uv environment. Implement only Phase 1, following the phase's acceptance criteria. Add appropriate automated tests and run the relevant tests, Django checks, Ruff linting, and formatting checks. Report the actual results and any issues. Give me clear manual verification instructions, including how to run the application and what behavior I should test. Do not start the next phase, modify unrelated features, or commit anything until I have reviewed and approved the work."
+3. "appropved" — approved the proposed TDD behaviors: blank search must not call the provider; timeout must show retry guidance and retain the query.
+4. "yes" — approved the first failing blank-search test before implementation.
+5. "yes" — confirmed the passing blank-search behavior before proceeding to timeout handling.
+6. "yes" — approved the failing timeout test before implementation.
+7. "okay just run through this feature automatically in the future. Everything is approved." — authorized continuing the remaining Phase 1 implementation/checks without repeated TDD approval pauses. The agent retained the manual-review and no-commit boundary.
+8. Review/logging request (summary): "Phase 1 has been reviewed." Update PROMPTS.md with the actual implementation session, significant prompts, decisions, tests, manual verification, and requested fixes; preserve prior entries. Review AGENTS.md for essential new verified project-wide guidance, adding preferably 1–7 lines. Do not begin Phase 2.
+
+The attached implement skill delegated to the local TDD skill, which initially required separate selection, failing-test, and passing-behavior approvals. The user's subsequent automation instruction superseded further TDD approval pauses for this feature.
+
+### Exploration, implementation, and decisions
+
+- Read root guidance, the implement/TDD skills, approved ShowVault PRD and plan, selected progress prototype, TVmaze research, existing console code/tests and uv configuration, and relevant adjacent ATS configuration/styling patterns. Rechecked official TVmaze, Django authentication, and django-tailwind-cli documentation during integration.
+- Initially created AGENTS.md at 28 lines. During implementation replaced its stale not-implemented statement with verified layout guidance and added checks/setup commands, bringing it to 30 lines before the current logging update.
+- Used the existing uv environment and lockfile. Installed Django 5.2.19, django-tailwind-cli 4.8.2, pytest 9.2.0, and pytest-django 4.14.0 alongside existing requests/Ruff. Introduced `config/`, one `shows/` app, pytest discovery and Ruff configuration, and applied Django's built-in account/admin/session migrations. No persisted show model or application-specific migration was needed in Phase 1.
+- Implemented Django session login for ordinary active users, protected welcome/discovery pages, POST logout with CSRF, styled authentication feedback, and Django admin account creation. Used built-in authentication redirect protections; ordinary users cannot access admin. No public signup or seeded credentials were added.
+- Delivered submitted GET discovery with all provider results in relevance order, title/year/summary/poster rendering, loading feedback, optional-field placeholders, escaped plain text, TVmaze source links, and CC BY-SA/transformation attribution. Used a shared base template, Tailwind/DaisyUI CSS, a local poster placeholder, and small local JavaScript for loading and broken-image fallback. HTMX interaction behavior remains a later-phase feature.
+- Implemented the official server-side search boundary in `shows/tvmaze.py`: encoded query parameters, identifying User-Agent, 10-second connection/read timeouts, response validation, useful provider errors, and no automatic retry. Its thread-safe shared gate allows one outbound request per second in a single local server process and honors Retry-After seconds/HTTP dates after 429 responses. It does not coordinate multiple processes.
+- Added `discovery_demo` as a DEBUG-only loopback development command for timeout, rate-limit, malformed, no-results, and missing-data scenarios. Fixtures intercept provider HTTP only in that process; there are no public fixture switches or arbitrary provider URLs. The missing-data fixture includes both absent and broken images.
+- Expanded README with setup, account creation, normal running, checks, numbered browser scenarios, and deterministic fixture instructions. Recorded Phase 1 as awaiting manual verification in the plan at handoff; did not mark its acceptance checkboxes complete or start Phase 2. The existing console script received only a line-wrap change to satisfy the newly configured Ruff line-length rule.
+
+### Actual automated and integration verification
+
+| Check | Observed result |
+| --- | --- |
+| First TDD blank-search RED | Assertion failed because the provider boundary was called once with an empty string. |
+| Blank-search GREEN and regressions | 8 passed, 13 subtests passed after adding the trim/blank guard and useful feedback. |
+| Timeout RED | Assertion expected HTTP 200 but received HTTP 500 from the uncaught simulated timeout. |
+| Timeout GREEN and regressions | 9 passed, 13 subtests passed after catching the timeout and retaining the query. |
+| Initial expanded pytest suite | 1 failed, 71 passed, 13 subtests passed; result-count pluralization rendered incorrectly. Fixed the template suffix. |
+| Intermediate expanded suite | 75 passed, 13 subtests passed, with one pytest cache-write warning. |
+| Final full pytest run | 79 passed, 13 subtests passed in 10.21 seconds; no warning reported. The suite covers account creation/access, login redirects, CSRF/logout methods, search validation/rendering, escaping, HTTP/data failures, shared throttling across users/threads, Retry-After, and all fixture scenarios. |
+| Separate console unittest runner | 7 test methods passed, OK; these console behaviors are also collected by pytest, not seven additional distinct application tests. |
+| `uv sync --locked` | Passed: resolved 22 packages and checked 21 installed packages. |
+| Ruff lint and formatting | Final lint: All checks passed. Final format check: 41 files already formatted. |
+| Django checks | System check identified no issues; migration consistency reported No changes detected. Built-in migrations were applied successfully to local SQLite. |
+| Production CSS build | Passed using the standalone Tailwind/DaisyUI executable through django-tailwind-cli; final elevated build completed successfully. |
+| Local HTTP smoke checks | Anonymous `/` and `/discover/` returned 302; login returned 200; CSS, JavaScript, and placeholder SVG returned 200 with appropriate content types. The fixture server's login page also returned 200. Servers were stopped after checking. |
+| Live provider-client search | Final UTF-8 run exited 0, returning five Firefly-related matches, including an international title. This is one live search, not an uptime guarantee or a five-result application cap. |
+| Whitespace check | `git diff --check` reported no whitespace errors; Git emitted LF-to-CRLF notices. |
+
+### Manual verification and requested fixes
+
+- At handoff, supplied commands for locked uv setup, migration, CSS build, superuser creation, and development-server startup. Directed the user to create two ordinary users in admin and test authentication, wrong credentials, blocked admin access, discovery success/blank/no-match cases, attribution, POST sign-out, JavaScript fallback, loading feedback, keyboard/narrow-window layout, and deterministic provider failures/missing posters.
+- The agent performed HTTP smoke checks and automated tests, not interactive browser verification. Broken-poster replacement and visual/loading behavior were explicitly left for browser review.
+- The current user message states, "Phase 1 has been reviewed." No individual browser scenario outcomes, screenshots, or requested manual-review fixes were supplied in this conversation. Record that review without inventing a claim that every browser scenario passed. No post-review feature fixes were requested or made.
+- This logging task adds two essential AGENTS.md conventions: reuse the verified single-process provider gate, and use the verified local fixture command for browser failure checks. Existing stack, layout, setup/check commands, and approved references remain intact. No implementation checks were rerun for this documentation-only update.
+
+### Summary
+
+- **Outcome:** Phase 1 authentication/discovery implemented and tested; startup/manual verification instructions supplied; user reports the phase reviewed. Preserved previous log entries and added only essential verified guidance. No Phase 2 work, commit, or push was performed.
+- **Deviations:** the user approved the TDD selections/cycles, then explicitly removed further approval pauses for the feature. Manual review and commit boundaries remained. No user-requested product-scope changes or review fixes occurred.
+- **Sideways:** uv cache access and network restrictions required escalation for dependency installation and uv checks; uv fell back from hardlinks to copies. An initial patch was rejected for multiple operations targeting one file and was reapplied correctly. Early Ruff checks found generated unused imports, import order, formatting, and long lines; these were corrected. An expanded test caught incorrect match pluralization, which was fixed. One pytest cache-write warning did not recur. Sandbox restrictions blocked the first Tailwind download and later execution of its downloaded binary; elevated runs succeeded. The first live client attempt was blocked by networking; an elevated attempt fetched results but failed printing international text under Windows cp1252. Re-running with `python -X utf8` succeeded. None of those failed attempts is counted as a passing check.
+
 ## 2026-11-14 — Approved six-phase ShowVault implementation plan
 
 ### Prompts

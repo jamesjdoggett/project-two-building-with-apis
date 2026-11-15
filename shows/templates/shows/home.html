@@ -1,0 +1,11 @@
+{% extends 'shows/base.html' %}
+{% block content %}
+<section class="card max-w-2xl border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-5">
+    <p class="text-sm font-semibold uppercase tracking-widest text-primary">Welcome to ShowVault</p>
+    <h1 class="text-4xl font-bold">Find your next great show.</h1>
+    <p>Welcome, {{ user.username }}. Explore TVmaze's catalog by show title.</p>
+    <div><a class="btn btn-primary" href="{% url 'shows:discover' %}">Discover shows</a></div>
+  </div>
+</section>
+{% endblock %}

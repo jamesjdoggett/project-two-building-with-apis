@@ -2,7 +2,7 @@
 
 > Source PRD: [ShowVault](../prd/showvault.md).
 >
-> Status: six-phase breakdown approved by the user on 2026-11-14. Implementation has not started and is not authorized by this planning task.
+> Status: six-phase breakdown approved by the user on 2026-11-14. Phase 1 implementation was subsequently authorized and is awaiting manual verification; phases 2–6 have not started.
 >
 > References: [progress prototype](../prototypes/watch-progress.html), [TVmaze research](../research/api-provider-comparison.md), and the adjacent [ATS implementation plan](../../applicant-tracking-system/plans/applicant-tracking-system.md).
 
@@ -36,6 +36,8 @@
 ## Phase 1: Authentication and TVmaze discovery
 
 **User stories**: 1–4, 17, 18 (saved indicators from story 4 arrive with persistence in phase 2).
+
+**Review status**: implemented and awaiting the user's browser verification; not yet complete or committed. Automated verification: 79 pytest tests plus 13 subtests pass, the separate 7-method console unittest suite passes, and Django system/migration checks, Ruff lint/format, locked uv sync, applied built-in migrations, and the production CSS build pass. HTTP smoke checks verified anonymous redirects, login, and static assets; a live client search returned five Firefly-related results. Browser layout, loading feedback, failed-poster replacement, and the manual account/search walkthrough remain for user review. An intermediate pytest cache-write warning did not recur on the subsequent full run. See README for run and deterministic failure-demo instructions.
 
 ### What to build
 

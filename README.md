@@ -1,8 +1,103 @@
 # project-two-building-with-apis
 
+ShowVault Phase 1 provides administrator-created ordinary accounts, session
+sign-in/sign-out, a protected welcome page, and TVmaze discovery. Saving shows,
+personal libraries, HTMX results, and REST endpoints belong to later phases.
+Phase 1 is awaiting manual review; nothing has been committed by this session.
+
+## Run the Phase 1 website
+
+From the repository root in PowerShell, using the existing uv environment:
+
+```powershell
+uv sync --locked
+uv run python manage.py migrate
+uv run python -X utf8 manage.py tailwind build
+uv run python manage.py createsuperuser
+uv run python manage.py runserver
+```
+
+Create a superuser only if you do not already have one. Open
+<http://127.0.0.1:8000/admin/>, sign in as that administrator, and add two users
+under Authentication and Authorization → Users. Give each a usable password;
+leave Staff status and Superuser status unchecked and Active checked. Sign out
+of admin, then use <http://127.0.0.1:8000/accounts/login/> for ordinary sign-in.
+Passwords are chosen locally; no demo accounts or fixed credentials are seeded.
+
+### Browser verification
+
+1. While signed out, visit `/` and `/discover/`. Both should redirect to sign-in.
+   Try incorrect credentials: an accessible error appears and you remain signed
+   out. Sign in with either ordinary account: its welcome page and discovery are
+   available without staff privileges. `/admin/` remains inaccessible to that user.
+2. Submit `Firefly` in discovery. Results should show recognizable titles,
+   premiere years when known, summaries, and posters. Follow a TVmaze source
+   link and inspect the attribution/license/transformation notice. Results retain
+   relevance order; the console script's five-result cap does not apply here.
+3. Submit whitespace: expect “Enter a show title” without a provider request.
+   Submit `zzzzprojecttwonomatchqwerty987654321`: expect a normal no-shows message
+   and retained query, with no red failure banner. Wait at least one second
+   between searches; earlier requests receive local wait guidance.
+4. Test with JavaScript disabled: ordinary GET searches must still work. With
+   JavaScript enabled, search submission shows loading feedback. Check keyboard
+   navigation, visible focus, labels, narrow-window layout, and the sign-out button.
+5. Sign out using the button: discovery requires sign-in again. Navigating to
+   `/accounts/logout/` directly must return Method Not Allowed instead of logging
+   you out. Sign in with the other ordinary account and repeat the access checks.
+6. For deterministic errors and missing metadata, stop the ordinary server with
+   Ctrl+C and run one of the commands below. Sign in using the same local
+   accounts, submit any nonblank query on `/discover/`, and verify its expected
+   state. Stop each fixture server before starting the next.
+
+```powershell
+uv run python manage.py discovery_demo timeout
+uv run python manage.py discovery_demo rate-limit
+uv run python manage.py discovery_demo malformed
+uv run python manage.py discovery_demo no-results
+uv run python manage.py discovery_demo missing-data
+```
+
+The timeout fixture shows retry guidance; rate-limit asks you to wait five seconds;
+malformed shows invalid-data feedback. All retain the query and show no traceback.
+No-results is a normal empty state. Missing-data returns two fixture cards with
+unknown years, missing-summary fallback, plain-text summary conversion, and both
+absent and broken posters replaced by the local placeholder. Verify the broken
+image fallback with JavaScript enabled. The demo command binds only to
+127.0.0.1:8000, requires DEBUG, intercepts only outbound TVmaze requests in that
+process, and creates no accounts or saved data. Restart `runserver` to resume real
+TVmaze access; there is no public URL or query parameter for selecting fixtures.
+
+### Phase 1 automated checks
+
+```powershell
+uv run pytest
+uv run python -m unittest discover -s tests -v
+uv run python manage.py check
+uv run python manage.py makemigrations --check --dry-run
+uv run ruff check .
+uv run ruff format --check .
+uv run python -X utf8 manage.py tailwind build
+```
+
+Tests mock TVmaze, including timeouts, connection failures, 429, other HTTP
+failures, invalid JSON/shapes, optional fields, escaping, and shared throttling.
+Authentication tests cover admin account creation, non-staff access, CSRF,
+POST-only logout, inactive accounts, and safe login redirects. The request gate
+allows one outbound request per second across users/threads within one local
+server process and extends its cooldown from Retry-After seconds or HTTP dates;
+it does not coordinate multiple server processes. No automatic retry is made.
+
+The [implementation plan](plans/showvault.md) and [AGENTS.md](AGENTS.md) describe
+the approved scope and project conventions. Provider behavior was checked against
+[TVmaze's official documentation](https://www.tvmaze.com/api); session login/logout
+uses [Django's built-in authentication views](https://docs.djangoproject.com/en/5.2/topics/auth/default/).
+The CSS build follows [django-tailwind-cli's usage documentation](https://django-tailwind-cli.readthedocs.io/latest/usage/).
+
+## Original console API experiment
+
 The first API experiment is a standalone console search of TVmaze. It uses Python
-3.14 (the installed version used for this project), uv, requests, and Ruff. Django
-and Django REST Framework have not been implemented or installed yet.
+3.14 (the installed version used for this project), uv, requests, and Ruff. It
+remains separate from the Django application; DRF endpoints are not implemented.
 
 From the repository root in PowerShell:
 

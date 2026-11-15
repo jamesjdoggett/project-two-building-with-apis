@@ -129,7 +129,10 @@ def main():
     except requests.ConnectionError:
         message = "Could not connect. Check your internet connection and the API URL."
     except requests.HTTPError as error:
-        message = f"HTTP error {error.response.status_code}. Check the URL or try again later."
+        message = (
+            f"HTTP error {error.response.status_code}. "
+            "Check the URL or try again later."
+        )
     except requests.exceptions.JSONDecodeError:
         message = "Invalid response: the server did not return valid JSON."
     except requests.RequestException:
