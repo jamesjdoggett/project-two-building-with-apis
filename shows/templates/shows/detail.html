@@ -21,11 +21,12 @@
     </div>
     <section aria-labelledby="personal-heading">
       <h2 id="personal-heading" class="mb-3 text-xl font-bold">Your viewing</h2>
+      <a class="btn btn-primary btn-sm mb-4" href="{% url 'shows:edit' entry.pk %}">Edit viewing details</a>
       <dl class="grid gap-3 sm:grid-cols-2">
-        <div><dt class="font-semibold">Watch status</dt><dd>Planned</dd></div>
-        <div><dt class="font-semibold">Personal rating</dt><dd>Unrated</dd></div>
-        <div><dt class="font-semibold">Notes</dt><dd>No notes yet.</dd></div>
-        <div><dt class="font-semibold">Last finished season / episode</dt><dd>No bookmark set.</dd></div>
+        <div><dt class="font-semibold">Watch status</dt><dd>{{ entry.get_watch_status_display }}</dd></div>
+        <div><dt class="font-semibold">Personal rating</dt><dd>{% if entry.rating %}{{ entry.rating }} / 10{% else %}Unrated{% endif %}</dd></div>
+        <div><dt class="font-semibold">Notes</dt><dd class="whitespace-pre-line break-words">{{ entry.notes|default:'No notes yet.' }}</dd></div>
+        <div><dt class="font-semibold">Last finished season / episode</dt><dd>{% if entry.last_season != None %}S{{ entry.last_season }} E{{ entry.last_episode }}{% else %}No bookmark set.{% endif %}</dd></div>
       </dl>
     </section>
     <section aria-labelledby="source-heading" class="text-sm">

@@ -31,3 +31,5 @@ Private TV show tracking website and REST API for discovering shows through TVma
 - Provider requests use `shows/tvmaze.py` and its shared `request_gate`: one request/second across users/threads in one local server process; 429 Retry-After guidance extends the cooldown.
 - Browser failure fixtures: `uv run python manage.py discovery_demo timeout` starts a DEBUG-only loopback server; other verified scenarios and expected results are documented in README.md.
 - Reuse `shows.operations.save_entry(owner, tvmaze_id)`, returning `(entry, created)`; owned duplicates bypass HTTP, database uniqueness recovers collisions, and `SaveBusy` requires explicit retry feedback for SQLite locks. Never hold a write transaction during provider HTTP.
+- Personal validation lives in `shows/personal.py`: pass the complete parsed personal state to `validate_personal_fields`; `PERSONAL_FIELDS` defines the editable field allowlist.
+- Reuse `shows.library.library_entries(owner, params)` for owner-scoped local lists; it returns the ordered queryset and normalized `q`, `status`, and `sort` controls.

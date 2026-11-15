@@ -1,0 +1,28 @@
+{% extends 'shows/base.html' %}
+{% block title %}Edit {{ entry.title }} | ShowVault{% endblock %}
+{% block content %}
+<a class="link mb-5 inline-block" href="{% url 'shows:detail' entry.pk %}">Back to show</a>
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body">
+    <h1 class="mb-4 break-words text-3xl font-bold">Edit your viewing: {{ entry.title }}</h1>
+    <p>Rating is optional, from 1 to 10. Notes are private plain text, up to 5,000 characters.</p>
+    <p>Your bookmark is the last episode you finished. Season 0 represents specials. Enter both numbers or leave both blank. You can also check Clear bookmark. Episodes are not checked against TVmaze.</p>
+    <p>Watch status and bookmark are independent. Completed means you consider your viewing finished. Corrections and clearing never change your chosen status; choosing Planned for a rewatch keeps your bookmark.</p>
+    <form method="post" class="mt-5 space-y-5">
+      {% csrf_token %}
+      {% if form.errors %}<div class="alert alert-error" role="alert">Nothing was saved. Correct the errors below. {{ form.non_field_errors }}</div>{% endif %}
+      {% for field in form %}
+        <div>
+          <label class="mb-2 block font-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}<div class="mt-2 text-error" id="{{ field.auto_id }}_error">{{ field.errors }}</div>{% endif %}
+        </div>
+      {% endfor %}
+      <div class="flex flex-wrap gap-3">
+        <button class="btn btn-primary" type="submit">Save viewing details</button>
+        <a class="btn btn-ghost" href="{% url 'shows:detail' entry.pk %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

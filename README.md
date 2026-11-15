@@ -2,9 +2,9 @@
 
 ShowVault now supports administrator-created ordinary accounts, session
 sign-in/sign-out, TVmaze discovery, authoritative show saving, and private local
-libraries. Phase 2 is implemented and awaiting browser review. Personal editing,
-refresh/deletion, local search/filter/sort controls, HTMX, and REST endpoints remain
-in their approved later phases. This session has made no commits.
+libraries, personal editing, and local search/filter/sort controls. Phase 3 is
+implemented and awaiting browser review. Refresh/deletion, HTMX, and REST endpoints
+remain in their approved later phases. This session has made no commits.
 
 ## Run the website
 
@@ -25,6 +25,122 @@ leave Staff status and Superuser status unchecked and Active checked. Sign out
 of admin, then use <http://127.0.0.1:8000/accounts/login/> for ordinary sign-in.
 Passwords are chosen locally; no demo accounts or fixed credentials are seeded.
 
+### Phase 3 browser verification
+
+The Phase 3 migrations have been applied locally. For another checkout, run the
+setup commands above before testing. Use two ordinary accounts and a staff/admin
+account, with separate browser profiles for isolation checks.
+
+1. Sign in, open a saved show's detail, and click **Edit viewing details**.
+   Existing snapshots start with Planned, Unrated, blank notes, and no bookmark.
+   The form must show saved values when reopened. Change a value and click
+   **Cancel**: the detail must remain unchanged. Loading an edit URL never saves.
+2. Save a rating of `1`, then `10`, then blank. Expect the chosen value on detail
+   and the library card; blank displays **Unrated**. Enter two note lines including
+   `<script>alert("test")</script>`: they display as literal text with line breaks,
+   and no script executes. Reopen the form and verify the text is preserved.
+   Blank notes are valid and display **No notes yet.**
+3. Test the notes boundary precisely: on the edit page, open DevTools Console and
+   run `document.querySelector('[name="notes"]').value = 'n'.repeat(5000)`, then
+   save. All 5,000 characters must persist. For server-side rejection testing,
+   in DevTools Elements add `novalidate` to the edit `<form>` and remove
+   `maxlength` from the notes textarea, then set its value to `'n'.repeat(5001)`
+   and submit. Expect **Nothing was saved** and a notes error. Reopen detail in a
+   separate tab: the last valid notes and all other values must be unchanged.
+4. With browser validation disabled on that form as above, submit rating `0`,
+   `11`, and `1.5` separately; season `-1` and `1.5`; episode `0` and `1.5`;
+   and each partially filled bookmark pair. Each must return a field error,
+   retain the attempted form values for correction, and leave all saved values
+   unchanged. For any test, also change a valid field such as notes before
+   submitting, then check that it was not partially saved. Normal browser
+   validation may prevent these submissions before reaching Django.
+5. Save **S0 E1** and choose each of Planned, Watching, Paused, Completed, and
+   Dropped in turn. The status must change only when chosen; the bookmark stays
+   S0 E1. In Completed, save S3 E8 and correct it to S3 E7: status stays Completed.
+   Choose Paused and correct to S2 E4: status stays Paused. Choose Completed,
+   then Planned to plan a rewatch: S2 E4 stays. Check **Clear bookmark (keep watch
+   status)** and save: the bookmark becomes **No bookmark set.**, status stays
+   Planned. Reopen: both number fields are blank and Clear bookmark is unchecked.
+   Entering and saving two blank number fields also explicitly removes a bookmark.
+6. For repeatable pagination, use a dedicated fresh ordinary account and start
+   `uv run python manage.py discovery_demo library` after stopping any other
+   development server. Search `demo` and save its 21 fixture shows, waiting at
+   least one second between provider actions. All start Planned. Give two shows
+   rating 10, another rating 1, and leave the rest Unrated. Keep every show's
+   status Planned for the next combined-filter pagination check.
+7. In **My library**, submit title `  dEmO sHoW  `, status **Planned**, and sort
+   **Personal rating (highest first)**. Expect 21 matches, with rating 10 first,
+   then 1, then Unrated. Page 1 has 20 entries; **Next** opens the remaining one.
+   The trimmed title, selected status, and sort must persist in controls and URLs
+   through Next/Previous. Refresh the same URL: tied ratings retain their order.
+   Try **Title A–Z** and **Recently saved**, and filter each status after editing
+   one show to it. **Apply** starts at page 1; **Reset** clears the controls.
+8. Check `/library/?q=demo&status=planned&sort=rating&page=bad`: first page.
+   Use `page=999`, `page=0`, or `page=-1`: last page. Use
+   `/library/?status=invalid&sort=invalid`: All statuses and Recently saved.
+   Search a nonexistent local title: **No saved shows match these filters**
+   with a reset link. A separate account with no saved entries instead sees
+   **Your library is empty**, even if another account has matching shows.
+9. Stop the fixture server and run
+   `uv run python manage.py discovery_demo timeout`. Directly open saved detail,
+   edit and save personal fields, and repeat all library controls and pagination.
+   These local operations must still succeed; discovery must report a timeout.
+   Successful edits never change the metadata snapshot or retrieval time.
+   An already-open saved discovery card still opens the same entry unchanged.
+   Use this server fixture rather than browser offline mode, which blocks localhost.
+10. As the second ordinary account and then staff/admin on the ordinary website,
+    request the first account's `/library/<id>/edit/`: expect 404. Their libraries
+    and filtered counts contain only their own shows. Sign out and request an
+    edit URL: expect login. Disable JavaScript and check that editing, error
+    feedback, library controls, and pagination still work as conventional forms.
+11. For a forged-field check while signed in on your own edit page, run the
+    following in DevTools Console (the form's CSRF token is included):
+
+    ```javascript
+    const editForm = document.querySelector('[name="rating"]').form;
+    const forged = new FormData(editForm);
+    forged.set('owner', '999999');
+    fetch(editForm.action, {method: 'POST', body: forged}).then(r => console.log(r.status));
+    ```
+
+    Expect `400` and no saved changes. Repeat with `forged.delete('owner')` and
+    `forged.set('title', 'Forged title')`: also 400. To check CSRF, delete both
+    forged fields and `csrfmiddlewaretoken` from this FormData and submit again:
+    expect 403. Reload detail to verify unchanged data. These are temporary
+    browser requests, not changes to application code.
+
+Stop the fixture server and use `uv run python manage.py runserver` to restore
+live TVmaze. Check keyboard focus, visible errors, and narrow-window layout.
+Refresh, deletion, HTMX, and REST endpoints are intentionally deferred.
+
+### Phase 3 automated verification
+
+Actual results from this implementation session:
+
+- `uv run pytest`: **226 passed**, including 64 new Phase 3 tests. One existing
+  pytest cache-write warning reported Windows error 183 for `.pytest_cache/v/cache`;
+  no test failed.
+- `uv run python -m unittest discover -s tests -v`: **7 passed**.
+- `uv run python manage.py check`: no issues.
+- `uv run python manage.py makemigrations --check --dry-run`: no changes detected.
+- `uv run python manage.py migrate`: `shows.0002` personal fields and
+  `shows.0003` constraints applied successfully.
+- `uv run ruff check .`: all checks passed.
+- `uv run ruff format --check .`: all **52** Python files formatted.
+- `uv run python -X utf8 manage.py tailwind build`: production stylesheet built.
+
+Each selected TDD test failed on an assertion before its implementation and passed
+afterward: invalid-edit preservation, visible independent bookmark corrections/
+rewatch/clear, and combined private query controls with retained pagination.
+Additional tests cover all five statuses, validation boundaries and parsed types,
+escaping, provider/snapshot immutability, database numeric/status/pair constraints,
+existing-row migration defaults, forbidden fields, ownership including staff and
+superusers, session CSRF, normalized choices, deterministic sorts, malformed pages,
+distinct empty states, and local operations with HTTP forbidden.
+
+Browser verification above remains for user review; automated results do not claim
+manual browser acceptance. No Phase 4 implementation, commits, or pushes were made.
+
 ### Phase 2 browser verification
 
 Use a fresh ordinary account for an initially empty library, a second ordinary
@@ -42,8 +158,8 @@ are expected because search and save share the request budget.
    genres, language, dates, TVmaze status, poster, source/license/transformation
    notice, successful retrieval time, and saved time. Missing metadata reads
    **Unknown** or uses another clear placeholder. Personal defaults are **Planned**,
-   **Unrated**, **No notes yet.**, and **No bookmark set.** There are no edit,
-   refresh, delete, or API controls in this phase.
+   **Unrated**, **No notes yet.**, and **No bookmark set.** Phase 3 now adds editing;
+   refresh, delete, and API controls remain deferred.
 3. Record the detail URL and retrieval time. Open **My library**: its card opens
    that detail page. Search again: only shows saved by this account have a
    **Saved** badge and **Open saved entry** button. Click that button repeatedly:
@@ -98,8 +214,8 @@ create no partial entry. All fixture servers require DEBUG and bind to loopback;
 there is no public failure-selection parameter. SQLite competing saves may return
 a safe **library is busy** retry page when a winning row is not yet visible.
 
-Phase 2 stores only snapshot/provenance fields. The displayed personal defaults
-are fixed until Phase 3 introduces their persisted fields and editing. Unique
+Phase 2 originally stored only snapshot/provenance fields; Phase 3 now persists
+the personal fields and exposes editing. Unique
 owner/show and positive provider-ID constraints are database-enforced. The shared
 save operation checks for an owned duplicate before HTTP, recovers unique insert
 collisions, and handles SQLite lock contention without retrying provider requests.

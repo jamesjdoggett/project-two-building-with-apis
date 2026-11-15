@@ -9,4 +9,5 @@ urlpatterns = [
     path("discover/", views.discover, name="discover"),
     path("discover/<int:tvmaze_id>/save/", views.save_show, name="save"),
     path("library/<int:pk>/", views.detail, name="detail"),
+    path("library/<int:pk>/edit/", views.edit, name="edit"),
 ]

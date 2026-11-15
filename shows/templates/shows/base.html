@@ -24,6 +24,7 @@
     </nav>
   </header>
   <main id="main" class="mx-auto max-w-6xl px-6 py-10">
+    {% for message in messages %}<div class="alert mb-5" role="status">{{ message }}</div>{% endfor %}
     {% block content %}{% endblock %}
   </main>
   <footer class="mx-auto max-w-6xl px-6 pb-8 text-sm text-base-content/70">

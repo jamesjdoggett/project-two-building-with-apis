@@ -2,7 +2,7 @@
 
 > Source PRD: [ShowVault](../prd/showvault.md).
 >
-> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1 and 2 have been implemented and recorded for browser review; phases 3–6 have not started. Phase 2 changes remain uncommitted as requested.
+> Status: six-phase breakdown approved by the user on 2026-11-14. Phases 1 and 2 have been implemented; Phase 3 is implemented and awaiting browser review. Phases 4–6 have not started. Phase 3 changes remain uncommitted as requested.
 >
 > References: [progress prototype](../prototypes/watch-progress.html), [TVmaze research](../research/api-provider-comparison.md), and the adjacent [ATS implementation plan](../../applicant-tracking-system/plans/applicant-tracking-system.md).
 
@@ -101,6 +101,8 @@ Introduce `Entry`, its owner relationship, metadata snapshot, provenance, timest
 ## Phase 3: Personal editing and library navigation
 
 **User stories**: 9–14, 17; extends outage independence in 7.
+
+**Review status**: implemented and awaiting user browser verification; not yet declared complete or committed. All three selected TDD behaviors failed on assertions before implementation and passed afterward. Actual verification: 226 full-suite pytest tests pass (64 new Phase 3 tests), with one existing Windows pytest-cache warning; the separate 7-method console suite, Django system checks, migration consistency, Ruff lint/format (52 files), and production CSS build pass. Applied personal-field and database-constraint migrations locally; a migration test verifies existing snapshot preservation and personal defaults. README records exact browser scenarios, including validation, independent progress, 21-match pagination, ownership, CSRF, and provider outages. Phase 4 has not started.
 
 ### What to build
 
